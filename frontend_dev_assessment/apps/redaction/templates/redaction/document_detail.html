@@ -1,0 +1,78 @@
+{% extends "redaction/base.html" %}
+
+{% block title %}{{ document.title }} - PDF Redaction Tool{% endblock %}
+
+{% block content %}
+<div class="flex flex-col lg:flex-row gap-6">
+    <!-- Left Panel: PDF Viewer -->
+    <div class="flex-1 bg-white rounded-lg shadow-md p-6">
+        <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-xl font-bold text-gray-800">{{ document.title }}</h2>
+            <a href="{% url 'redaction:document_list' %}" 
+               class="text-blue-600 hover:text-blue-800 text-sm">
+                &larr; Back to Documents
+            </a>
+        </div>
+
+        <!-- PDF Viewer Container -->
+        <div class="border border-gray-300 rounded-lg overflow-auto bg-gray-50" style="min-height: 600px;">
+            <!-- TODO for candidates: Implement PDF.js viewer here -->
+            <div id="pdf-container" class="p-4">
+                <div class="text-center py-12 text-gray-500">
+                    <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <p class="text-lg font-medium">PDF Viewer Placeholder</p>
+                    <p class="text-sm mt-2">Implement PDF.js viewer here to display:</p>
+                    <p class="text-sm font-mono mt-1">{{ document.file.url }}</p>
+                    <div class="mt-4 text-left max-w-md mx-auto bg-yellow-50 border border-yellow-200 rounded p-4">
+                        <p class="font-semibold text-yellow-900 mb-2">Implementation Steps:</p>
+                        <ol class="list-decimal list-inside text-sm text-yellow-800 space-y-1">
+                            <li>Load PDF.js library (already included in base.html)</li>
+                            <li>Fetch and render PDF from the URL above</li>
+                            <li>Add mouse event handlers for selection/drawing</li>
+                            <li>Send redaction data to: <code class="bg-yellow-100 px-1 rounded">{% url 'redaction:redaction_create' document.pk %}</code></li>
+                            <li>Use DataStar to update the redactions list dynamically</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-4">
+            <a href="{% url 'redaction:document_download' document.pk %}" 
+               class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded transition-colors">
+                📥 Download Redacted PDF
+            </a>
+        </div>
+    </div>
+
+    <!-- Right Panel: Redactions List -->
+    <div class="w-full lg:w-80 bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Redactions</h3>
+        
+        <div class="text-sm text-gray-600 mb-4">
+            <p>Total: <span class="font-semibold">{{ redactions.count }}</span></p>
+        </div>
+        {% include "redaction/redaction_list.html" %}
+    </div>
+</div>
+
+<!-- Help Section -->
+<div class="mt-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
+    <h4 class="font-semibold text-purple-900 mb-2">🎯 Implementation Guidelines</h4>
+    <div class="text-sm text-purple-800 space-y-2">
+        <p><strong>DataStar Resources:</strong></p>
+        <ul class="list-disc list-inside ml-4">
+            <li><a href="https://data-star.dev" target="_blank" class="underline">DataStar Documentation</a></li>
+            <li><a href="https://data-star.dev/examples" target="_blank" class="underline">DataStar Examples</a></li>
+        </ul>
+        <p class="mt-2"><strong>PDF.js Resources:</strong></p>
+        <ul class="list-disc list-inside ml-4">
+            <li><a href="https://mozilla.github.io/pdf.js/" target="_blank" class="underline">PDF.js Documentation</a></li>
+            <li><a href="https://mozilla.github.io/pdf.js/examples/" target="_blank" class="underline">PDF.js Examples</a></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
