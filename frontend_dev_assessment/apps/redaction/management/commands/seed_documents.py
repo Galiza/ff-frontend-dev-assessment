@@ -22,12 +22,11 @@ from reportlab.platypus import Paragraph
 from reportlab.platypus import SimpleDocTemplate
 from reportlab.platypus import Spacer
 
-from redaction.models import Document
-
+from frontend_dev_assessment.apps.redaction.models import Document
 
 class Command(BaseCommand):
     help = "Create sample PDF documents and seed them into the database"
-
+ 
     def handle(self, *args, **options):  # noqa: ARG002
         self.stdout.write("Creating sample PDF documents...")
 
