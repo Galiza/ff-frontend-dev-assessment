@@ -1,0 +1,61 @@
+<!-- <script>
+	let pageNum = "{{page_num|escapejs|default:1}}";
+	const event = new CustomEvent("paginationChanged", {
+		detail: { pageNum: Number(pageNum) },
+	});
+
+	function onPrevPage() {
+		if (pageNum <= 1) {
+			return;
+		}
+		pageNum--;
+		queueRenderPage(pageNum);
+	}
+	document.getElementById("prev").addEventListener("click", onPrevPage);
+
+	/**
+	 * Displays next page.
+	 */
+	function onNextPage() {
+		if (pageNum >= pdfDoc.numPages) {
+			return;
+		}
+		pageNum++;
+		queueRenderPage(pageNum);
+	}
+	document.getElementById("next").addEventListener("click", onNextPage);
+</script> -->
+
+<ds-state
+	id="pagination"
+	page="1"
+	page-count="{{page_count|escapejs|default:1}}"
+>
+	<div>
+		<button
+			id="prev"
+			ds-on:click="ds.set('pagination.page', Math.max(1, pagination.page - 1))"
+			ds-bind:disabled="pagination.page <= 1"
+		>
+			Previous
+		</button>
+		<button
+			id="next"
+			ds-on:click="ds.set('pagination.page', Math.min(pagination['page-count'], pagination.page + 1))"
+			ds-bind:disabled="pagination.page >= pagination['page-count']"
+		>
+			Next
+		</button>
+		&nbsp; &nbsp;
+		<span>
+			Page: <span id="page_num" ds-bind="pagination.page"></span> /
+			<span id="page_count" ds-bind="pagination['page-count']"></span>
+		</span>
+	</div>
+</ds-state>
+<!-- <div>
+	<button id="prev">Previous</button>
+	<button id="next">Next</button>
+	&nbsp; &nbsp;
+	<span>Page: <span id="page_num"></span> / <span id="page_count"></span></span>
+</div> -->
