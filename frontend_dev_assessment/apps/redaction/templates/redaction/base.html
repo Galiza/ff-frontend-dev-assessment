@@ -1,46 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}PDF Redaction Tool{% endblock %}</title>
-    
-    <!-- Tailwind CSS CDN for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- DataStar - Hypermedia framework -->
-    <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0-RC.6/bundles/datastar.js"></script>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>{% block title %}PDF Redaction Tool{% endblock %}</title>
+		<!-- Tailwind CSS CDN for styling -->
+		<script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- PDF.js CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
-    
-    {% block extra_head %}{% endblock %}
-</head>
-<body class="bg-gray-100 min-h-screen">
-    <!-- Navigation -->
-    <nav class="bg-white shadow-lg mb-6">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <h1 class="text-xl font-bold text-gray-800">
-                        <a href="{% url 'redaction:document_list' %}" class="hover:text-blue-600">
-                            PDF Redaction Tool
-                        </a>
-                    </h1>
-                </div>
-                <div class="flex items-center">
-                    <span class="text-sm text-gray-600">Frontend Developer Assessment</span>
-                </div>
-            </div>
-        </div>
-    </nav>
+		<!-- DataStar - Hypermedia framework -->
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0-RC.6/bundles/datastar.js"
+		></script>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        {% block content %}{% endblock %}
-    </main>
+		/>
 
-    {% block extra_scripts %}{% endblock %}
-</body>
+		<!-- PDF.js CDN -->
+		<script
+			src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs"
+			type="module"
+		></script>
+		<!-- <script src="https://raw.githubusercontent.com/mozilla/pdf.js/master/web/ui_utils.js"></script>
+		<script src="https://raw.githubusercontent.com/mozilla/pdf.js/master/web/text_layer_builder.js"></script> -->
+		<link
+			rel="stylesheet"
+			href="https://raw.githubusercontent.com/mozilla/pdf.js/master/web/pdf_viewer.css.css"
+		/>
+
+		{% block extra_head %}{% endblock %}
+	</head>
+	<body class="bg-gray-100 min-h-screen">
+		<!-- Navigation -->
+		<nav class="bg-white shadow-lg mb-6">
+			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div class="flex justify-between h-16">
+					<div class="flex items-center">
+						<h1 class="text-xl font-bold text-gray-800">
+							<a
+								href="{% url 'redaction:document_list' %}"
+								class="hover:text-blue-600"
+							>
+								PDF Redaction Tool
+							</a>
+						</h1>
+					</div>
+					<div class="flex items-center">
+						<span class="text-sm text-gray-600"
+							>Frontend Developer Assessment</span
+						>
+					</div>
+				</div>
+			</div>
+		</nav>
+
+		<!-- Main Content -->
+		<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+			{% block content %}{% endblock %}
+		</main>
+
+		{% block extra_scripts %}{% endblock %}
+	</body>
 </html>
-

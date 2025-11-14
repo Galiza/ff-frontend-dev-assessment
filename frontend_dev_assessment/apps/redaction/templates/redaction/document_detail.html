@@ -19,16 +19,64 @@ Redaction Tool{% endblock %} {% block content %}
 			style="min-height: 600px"
 		>
 			<!-- TODO for candidates: Implement PDF.js viewer here -->
-
 			<div id="pdf-container" class="p-4">
+				<div
+					id="modeSelector"
+					class="inline-flex rounded-2xl shadow-sm bg-white border border-gray-300 overflow-hidden"
+				>
+					<!-- Text Selection Mode -->
+					<button
+						data-mode="text"
+						class="mode-btn px-5 py-2 flex items-center gap-2 text-sm font-medium transition-all focus:outline-none"
+					>
+						✍️ <span>Text Selection</span>
+					</button>
+
+					<!-- Area Drawing Mode -->
+					<button
+						data-mode="area"
+						class="mode-btn px-5 py-2 flex items-center gap-2 text-sm font-medium transition-all focus:outline-none"
+					>
+						🟩 <span>Area Drawing</span>
+					</button>
+				</div>
 				{% include "redaction/pdf_loader.html" %}
+				<canvas id="pdf" class="mx-auto border border-gray-300"></canvas>
+				<div id="text-layer" class="textLayer"></div>
+
+				<!-- opacity-20  -->
+				<canvas
+					id="redaction-layer"
+					class="absolute pointer-events-none"
+				></canvas>
+
+				{% include "redaction/pagination.html" with page_count=1 page_num=1 %}
 				<script>
-					document.addEventListener("DOMContentLoaded", () => {
+					document.addEventListener("DOMContentLoaded", async () => {
+						// PDF.js is assumed to be loaded globally as pdfjsLib
+						console.log(globalThis);
+
+						console.log("{{ document.file.url }}");
+
+						let pdf = null;
+						let redactionMode = "text";
+						let redactionBoxes = [];
+						let isDrawing = false;
+						let currentPage = 1;
+
+						const buttons = document.querySelectorAll(".mode-btn");
 						const loader = document.getElementById("pdf-loader");
 						const canvas = document.getElementById("pdf");
+						const textLayer = document.getElementById("text-layer");
+						const redactionLayer = document.getElementById("redaction-layer");
+						const redactionCtx = redactionLayer.getContext("2d");
+						const url = "{{ document.file.url }}";
+						const ctx = canvas.getContext("2d");
+
 						loader.style.display = "flex";
 						canvas.style.display = "none";
-						// PDF.js is assumed to be loaded globally as pdfjsLib
+
+						// Setup of PDF.js worker
 						if (typeof pdfjsLib === "undefined") {
 							loader.innerHTML =
 								"<span class='text-red-600'>PDF.js library not loaded.</span>";
@@ -36,44 +84,121 @@ Redaction Tool{% endblock %} {% block content %}
 						}
 						pdfjsLib.GlobalWorkerOptions.workerSrc =
 							"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.mjs";
-						const url = "{{ document.file.url }}";
-						const ctx = canvas.getContext("2d");
-						pdfjsLib
-							.getDocument(url)
-							.promise.then((pdf) => {
-								document.getElementById("page_count").textContent =
-									pdf.numPages;
-								document.getElementById("page_num").textContent = 1;
-								window.addEventListener("paginationChanged", (e) => {
-									const newPageNum = e.detail.pageNum;
-									renderPage(newPageNum.pdf);
-								});
-							})
-							.catch(function (error) {
-								loader.innerHTML =
-									"<span class='text-red-600'>Failed to load PDF.</span>";
-								console.error(error);
-							});
-					});
 
-					function renderPage(pageNum, pdf) {
-						pdf.getPage(pageNum).then((page) => {
+						// Fetch Document from URL and render first page
+						try {
+							pdf = await pdfjsLib.getDocument(url).promise;
+							document.getElementById("pagination").dataset.pageCount =
+								pdf.numPages;
+							document.getElementById("page_count").textContent = pdf.numPages;
+							renderPage(1);
+						} catch (e) {
+							loader.innerHTML =
+								"<span class='text-red-600'>Failed to load PDF.</span>";
+							console.error(e);
+						}
+
+						// Start listening to event from pagination controls
+						globalThis.addEventListener("paginationChanged", (e) => {
+							if (e.detail.source !== "document-detail-pagination") {
+								return;
+							}
+							currentPage = e.detail.page;
+							renderPage(currentPage);
+						});
+
+						// Initialize update mode
+						updateMode(redactionMode);
+
+						async function renderPage(pageNum) {
+							const page = await pdf.getPage(pageNum);
+
 							const viewport = page.getViewport({ scale: 1.5 });
 							canvas.height = viewport.height;
 							canvas.width = viewport.width;
+							redactionLayer.height = viewport.height;
+							redactionLayer.width = viewport.width;
+							redactionLayer.style.left = canvas.offsetLeft + "px";
+							redactionLayer.style.top = canvas.offsetTop + "px";
 							const renderContext = {
 								canvasContext: ctx,
 								viewport: viewport,
 							};
-							page.render(renderContext).promise.then(() => {
-								document.getElementById("page_num").textContent = pageNum;
-							});
-						});
-					}
-				</script>
-				<canvas id="pdf" class="mx-auto border border-gray-300"></canvas>
-				{% include "redaction/pagination.html" with page_count=pdf.numPages %}
+							console.log("page ", page);
 
+							await page.render(renderContext).promise;
+
+							const textContent = await page.getTextContent();
+
+							textLayer.style.left = canvas.offsetLeft + "px";
+							textLayer.style.top = canvas.offsetTop + "px";
+							textLayer.style.height = canvas.offsetHeight + "px";
+							textLayer.style.width = canvas.offsetWidth + "px";
+
+							pdfjsLib.renderTextLayer({
+								textContentSource: textContent,
+								textContent: textContent,
+								container: textLayer,
+								viewport: viewport,
+								textDivs: [],
+							});
+
+							// pdfjsLib.renderTextLayer({
+							// 	textContentSource: textContent,
+							// 	container: document.getElementById("text-layer"),
+							// 	viewport: viewport,
+							// 	textDivs: [],
+							// });
+
+							// for (const item of textContent.items) {
+							// 	const tx = pdfjsLib.Util.transform(
+							// 		viewport.transform,
+							// 		item.transform
+							// 	);
+
+							// 	const span = document.createElement("span");
+							// 	span.textContent = item.str;
+							// 	span.style.left = tx[4] + "px";
+							// 	span.style.top = tx[5] - item.height + "px";
+							// 	span.style.fontSize =
+							// 		Math.sqrt(tx[0] * tx[0] + tx[1] * tx[1]) + "px";
+							// 	span.style.fontFamily = item.fontName;
+							// 	textLayer.appendChild(span);
+							// }
+							loader.style.display = "none";
+							canvas.style.display = "block";
+						}
+
+						function updateMode(mode) {
+							redactionMode = mode;
+
+							buttons.forEach((btn) => {
+								if (btn.dataset.mode === mode) {
+									btn.classList.add(
+										"bg-blue-600",
+										"text-white",
+										"shadow-inner"
+									);
+									btn.classList.remove("bg-white", "text-gray-800");
+								} else {
+									btn.classList.remove(
+										"bg-blue-600",
+										"text-white",
+										"shadow-inner",
+										"scale-105"
+									);
+									btn.classList.add("bg-white", "text-gray-800");
+								}
+							});
+
+							console.log(`Current mode: ${redactionMode}`);
+						}
+
+						for (const btn of buttons) {
+							btn.addEventListener("click", () => updateMode(btn.dataset.mode));
+						}
+					});
+				</script>
 				<!-- <div class="text-center py-12 text-gray-500">
 					<svg
 						class="mx-auto h-16 w-16 text-gray-400 mb-4"

@@ -1,61 +1,92 @@
-<!-- <script>
-	let pageNum = "{{page_num|escapejs|default:1}}";
-	const event = new CustomEvent("paginationChanged", {
-		detail: { pageNum: Number(pageNum) },
+<script>
+	document.addEventListener("DOMContentLoaded", function () {
+		const paginationDiv = document.getElementById("pagination");
+		let pageCount = Number(paginationDiv.dataset.pageCount) || 1;
+		let pageNum = "{{page_num|escapejs|default:1}}";
+
+		const nextElement = document.getElementById("next");
+		const prevElement = document.getElementById("prev");
+
+		function emitPaginationChanged(pageNum) {
+			const event = new CustomEvent("paginationChanged", {
+				detail: {
+					page: Number(pageNum),
+					source: "document-detail-pagination",
+				},
+			});
+			document.getElementById("page_num").textContent = pageNum;
+			globalThis.dispatchEvent(event);
+		}
+
+		function onPrevPage() {
+			if (pageNum <= 1) {
+				return;
+			}
+			if (prevElement.disabled) {
+				prevElement.disabled = false;
+			}
+			pageNum--;
+			emitPaginationChanged(pageNum);
+		}
+		prevElement.addEventListener("click", onPrevPage);
+
+		/**
+		 * Displays next page.
+		 */
+		function onNextPage() {
+			pageCount = Number(paginationDiv.dataset.pageCount);
+			if (pageNum >= pageCount) {
+				return;
+			}
+			if (nextElement.disabled) {
+				nextElement.disabled = false;
+			}
+			pageNum++;
+			emitPaginationChanged(pageNum);
+		}
+		nextElement.addEventListener("click", onNextPage);
 	});
+</script>
 
-	function onPrevPage() {
-		if (pageNum <= 1) {
-			return;
-		}
-		pageNum--;
-		queueRenderPage(pageNum);
-	}
-	document.getElementById("prev").addEventListener("click", onPrevPage);
-
-	/**
-	 * Displays next page.
-	 */
-	function onNextPage() {
-		if (pageNum >= pdfDoc.numPages) {
-			return;
-		}
-		pageNum++;
-		queueRenderPage(pageNum);
-	}
-	document.getElementById("next").addEventListener("click", onNextPage);
-</script> -->
-
-<ds-state
+<div
+	class="flex flex-row justify-center"
 	id="pagination"
-	page="1"
-	page-count="{{page_count|escapejs|default:1}}"
+	data-page-count="{{ page_count }}"
+	data-page-num="{{ page_num }}"
 >
-	<div>
-		<button
-			id="prev"
-			ds-on:click="ds.set('pagination.page', Math.max(1, pagination.page - 1))"
-			ds-bind:disabled="pagination.page <= 1"
+	<button id="prev" [disabled]="pageNum === 1">
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			fill="none"
+			viewBox="0 0 24 24"
+			stroke-width="1.5"
+			stroke="currentColor"
+			class="size-5"
 		>
-			Previous
-		</button>
-		<button
-			id="next"
-			ds-on:click="ds.set('pagination.page', Math.min(pagination['page-count'], pagination.page + 1))"
-			ds-bind:disabled="pagination.page >= pagination['page-count']"
-		>
-			Next
-		</button>
-		&nbsp; &nbsp;
-		<span>
-			Page: <span id="page_num" ds-bind="pagination.page"></span> /
-			<span id="page_count" ds-bind="pagination['page-count']"></span>
-		</span>
-	</div>
-</ds-state>
-<!-- <div>
-	<button id="prev">Previous</button>
-	<button id="next">Next</button>
-	&nbsp; &nbsp;
+			<path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				d="M15.75 19.5 8.25 12l7.5-7.5"
+			/>
+		</svg>
+	</button>
+	&nbsp;
 	<span>Page: <span id="page_num"></span> / <span id="page_count"></span></span>
-</div> -->
+	&nbsp;
+	<button id="next" [disabled]="pageNum === pageCount">
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			fill="none"
+			viewBox="0 0 24 24"
+			stroke-width="1.5"
+			stroke="currentColor"
+			class="size-5"
+		>
+			<path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				d="m8.25 4.5 7.5 7.5-7.5 7.5"
+			/>
+		</svg>
+	</button>
+</div>
