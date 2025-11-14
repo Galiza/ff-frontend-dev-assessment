@@ -1,4 +1,4 @@
-<script>
+<!-- <script>
 	document.addEventListener("DOMContentLoaded", function () {
 		const paginationDiv = document.getElementById("pagination");
 		let pageCount = Number(paginationDiv.dataset.pageCount) || 1;
@@ -87,6 +87,48 @@
 				stroke-linejoin="round"
 				d="m8.25 4.5 7.5 7.5-7.5 7.5"
 			/>
+		</svg>
+	</button>
+</div> -->
+<div
+	class="mt-4 flex items-center justify-between border-t border-gray-200 pt-4"
+>
+	<button
+		data-on-click="if($currentPage > 1) { $$store.set({currentPage: $currentPage - 1}); window.scrollToPage($currentPage - 1); }"
+		data-bind-disabled="$currentPage <= 1"
+		data-bind-class="$currentPage <= 1 ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+		class="flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors"
+	>
+		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				stroke-width="2"
+				d="M15 19l-7-7 7-7"
+			></path>
+		</svg>
+		<span>Previous</span>
+	</button>
+
+	<span class="text-sm text-gray-600">
+		Page <span data-text="$currentPage" class="font-semibold">1</span> of
+		<span id="total-pages" class="font-semibold">1</span>
+	</span>
+
+	<button
+		data-on-click="if($currentPage < window.pdfTotalPages) { $$store.set({currentPage: $currentPage + 1}); window.scrollToPage($currentPage + 1); }"
+		data-bind-disabled="$currentPage >= window.pdfTotalPages"
+		data-bind-class="$currentPage >= window.pdfTotalPages ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+		class="flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors"
+	>
+		<span>Next</span>
+		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				stroke-width="2"
+				d="M9 5l7 7-7 7"
+			></path>
 		</svg>
 	</button>
 </div>
