@@ -1,102 +1,29 @@
-<!-- <script>
-	document.addEventListener("DOMContentLoaded", function () {
-		const paginationDiv = document.getElementById("pagination");
-		let pageCount = Number(paginationDiv.dataset.pageCount) || 1;
-		let pageNum = "{{page_num|escapejs|default:1}}";
+<script type="module">
+	globalThis.emitUpdatedPage = emitUpdatedPage;
+	function emitUpdatedPage(currentPage) {
+		document
+			.getElementById("pdf-signals")
+			.dispatchEvent(updatePagination(currentPage));
+	}
 
-		const nextElement = document.getElementById("next");
-		const prevElement = document.getElementById("prev");
-
-		function emitPaginationChanged(pageNum) {
-			const event = new CustomEvent("paginationChanged", {
-				detail: {
-					page: Number(pageNum),
-					source: "document-detail-pagination",
-				},
-			});
-			document.getElementById("page_num").textContent = pageNum;
-			globalThis.dispatchEvent(event);
-		}
-
-		function onPrevPage() {
-			if (pageNum <= 1) {
-				return;
-			}
-			if (prevElement.disabled) {
-				prevElement.disabled = false;
-			}
-			pageNum--;
-			emitPaginationChanged(pageNum);
-		}
-		prevElement.addEventListener("click", onPrevPage);
-
-		/**
-		 * Displays next page.
-		 */
-		function onNextPage() {
-			pageCount = Number(paginationDiv.dataset.pageCount);
-			if (pageNum >= pageCount) {
-				return;
-			}
-			if (nextElement.disabled) {
-				nextElement.disabled = false;
-			}
-			pageNum++;
-			emitPaginationChanged(pageNum);
-		}
-		nextElement.addEventListener("click", onNextPage);
-	});
+	function updatePagination(page) {
+		return new CustomEvent("paginationchanged", {
+			detail: {
+				page,
+				source: "document-detail-pagination",
+			},
+		});
+	}
 </script>
 
 <div
-	class="flex flex-row justify-center"
-	id="pagination"
-	data-page-count="{{ page_count }}"
-	data-page-num="{{ page_num }}"
->
-	<button id="prev" [disabled]="pageNum === 1">
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke-width="1.5"
-			stroke="currentColor"
-			class="size-5"
-		>
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				d="M15.75 19.5 8.25 12l7.5-7.5"
-			/>
-		</svg>
-	</button>
-	&nbsp;
-	<span>Page: <span id="page_num"></span> / <span id="page_count"></span></span>
-	&nbsp;
-	<button id="next" [disabled]="pageNum === pageCount">
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke-width="1.5"
-			stroke="currentColor"
-			class="size-5"
-		>
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				d="m8.25 4.5 7.5 7.5-7.5 7.5"
-			/>
-		</svg>
-	</button>
-</div> -->
-<div
-	class="mt-4 flex items-center justify-between border-t border-gray-200 pt-4"
+	class="mt-4 flex items-center justify-center border-t border-gray-200 pt-4 gap-2"
+	data-signals:_pages="{currentPage: 1, totalPages: 1}"
 >
 	<button
-		data-on-click="if($currentPage > 1) { $$store.set({currentPage: $currentPage - 1}); window.scrollToPage($currentPage - 1); }"
-		data-bind-disabled="$currentPage <= 1"
-		data-bind-class="$currentPage <= 1 ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+		data-on:click="if($_pages.currentPage > 1) { $_pages.currentPage--; emitUpdatedPage($_pages.currentPage) }"
+		data-attr:disabled="$_pages.currentPage <= 1"
+		data-class="{'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400': $_pages.currentPage <= 1, 'bg-gray-100 text-gray-700 hover:bg-gray-200': $_pages.currentPage > 1}"
 		class="flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors"
 	>
 		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,14 +38,20 @@
 	</button>
 
 	<span class="text-sm text-gray-600">
-		Page <span data-text="$currentPage" class="font-semibold">1</span> of
-		<span id="total-pages" class="font-semibold">1</span>
+		Page <span data-text="$_pages.currentPage" class="font-semibold"></span> of
+		<span
+			id="totalPages"
+			data-on:totalpagesevent="$_pages.totalPages = evt.detail.totalPages"
+			data-text="$_pages.totalPages"
+			class="font-semibold"
+		></span>
 	</span>
 
 	<button
-		data-on-click="if($currentPage < window.pdfTotalPages) { $$store.set({currentPage: $currentPage + 1}); window.scrollToPage($currentPage + 1); }"
-		data-bind-disabled="$currentPage >= window.pdfTotalPages"
-		data-bind-class="$currentPage >= window.pdfTotalPages ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+		id="next-page"
+		data-on:click="if($_pages.currentPage < $_pages.totalPages) { $_pages.currentPage++; emitUpdatedPage($_pages.currentPage) }"
+		data-attr:disabled="$_pages.currentPage >= $_pages.totalPages"
+		data-class="{'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400': $_pages.currentPage >= $_pages.totalPages, 'bg-gray-100 text-gray-700 hover:bg-gray-200': $_pages.currentPage < $_pages.totalPages}"
 		class="flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors"
 	>
 		<span>Next</span>

@@ -1,10 +1,11 @@
 from io import BytesIO
 from pathlib import Path
-
 from datastar_py.django import datastar_response
 from datastar_py.sse import ServerSentEventGenerator as SSE
+import json
 from django.http import FileResponse
 from django.http import HttpResponseBadRequest
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
 from django.template.loader import render_to_string
@@ -78,17 +79,40 @@ def redaction_create(request, document_id):  # noqa: ARG001
 
     try:
         # TODO: Implement request parsing based on your frontend approach
+        data = json.loads(request.body.decode("utf-8"))
+        redaction_type = data.get("type")
+        coordinates = data.get("coordinates")
+        required_fields = {"x", "y", "width", "height", "page"}
 
-        redaction_type = None
-        coordinates = None
 
+        #JSON validation
+        if redaction_type not in ("text", "area"):
+            return JsonResponse({"error": "Invalid redaction type"}, status=400)
+        if not isinstance(coordinates, dict):
+            return JsonResponse({"error": "Invalid coordinates"}, status=400)
+        if not required_fields.issubset(coordinates):
+            return JsonResponse({"error": "Missing coordinate fields"}, status=400)
+        
+        # Convert coordinate values to float
+        float_coords = {"page": coordinates.get("page")}
+        for key in ("x", "y", "width", "height"):
+            value = coordinates.get(key)
+            try:
+                float_coords[key] = float(value)
+            except (TypeError, ValueError):
+                return JsonResponse({"error": f"Invalid coordinate value for {key}"}, status=400)
+            
         # Create the redaction
-        redaction = Redaction.objects.create(document=document, redaction_type=redaction_type, coordinates=coordinates)   # noqa: F841
+        redaction = Redaction.objects.create(document=document, redaction_type=redaction_type, coordinates=float_coords)
 
-        # TODO: Return appropriate response
 
-    except Exception as e:
-        raise HttpResponseBadRequest() from e
+        # Return appropriate response
+        return render(request, "redaction/notification.html", {
+            "title": redaction.document.title
+        })
+
+    except Exception:
+        return HttpResponseBadRequest()
 
 
 def document_download_redacted(request, document_id):  # noqa: ARG001
