@@ -2,12 +2,7 @@
 Redaction Tool{% endblock %} {% block content %}
 <div class="flex flex-col lg:flex-row gap-6">
 	<!-- Left Panel: PDF Viewer -->
-	<div
-		id="pdf-signals"
-		class="flex-1 bg-white rounded-lg shadow-md p-6"
-		data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1}}"
-		data-on:paginationchanged="evt.detail.source === 'document-detail-pagination' ? $coordinates.page = evt.detail.page  : ''"
-	>
+	<div id="pdf-signals" class="flex-1 bg-white rounded-lg shadow-md p-6">
 		<div class="mb-4 flex items-center justify-between">
 			<h2 class="text-xl font-bold text-gray-800">{{ document.title }}</h2>
 			<a
@@ -20,9 +15,13 @@ Redaction Tool{% endblock %} {% block content %}
 
 		<!-- PDF Viewer Container -->
 		<div
+			id="pdf-viewer-container"
 			class="border border-gray-300 rounded-lg overflow-auto bg-gray-50"
 			style="min-height: 600px"
+			data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1}}"
+			data-on:paginationchanged="evt.detail.source === 'document-detail-pagination' ? $coordinates.page = evt.detail.page  : ''"
 		>
+			<!-- data-on:datastar-fetch="evt.detail.type === 'finished' && console.log('Fetch finished  encountered >> ', evt.detail)" -->
 			<!-- TODO for candidates: Implement PDF.js viewer here -->
 			<!-- Mode Selector -->
 			<div
@@ -64,14 +63,12 @@ Redaction Tool{% endblock %} {% block content %}
 					<div
 						id="text-layer"
 						class="textLayer"
-						data-on:mouseup="$coordinates = {...handleTextSelection(evt), page: $coordinates.page}; 
-                        @post('/document/{{ document.pk }}/redactions/create/')"
+						data-on:mouseup="evt.target.matches('span') ? ($coordinates = {...handleTextSelection(evt), page: $coordinates.page}, @post('/document/{{ document.pk }}/redactions/create/')) : ''"
 					></div>
-					<!-- __action('post', {type: $_pdf.annotationMode, coordenates: {x: $result.x, y: $result.y, width: $result.width, height: $result.height, page: 1}}, '/document/{{ document.pk }}/redactions/create/')" -->
 				</div>
 
 				{% include "redaction/pagination.html" %}
-				<script async type="module">
+				<script type="module">
 					let pdf = null;
 					let pageRendering = false;
 					let pageNumPending = null;
@@ -110,9 +107,9 @@ Redaction Tool{% endblock %} {% block content %}
 					// Initialize PDF
 					async function initPDF() {
 						if (typeof pdfjsLib === "undefined") {
-							loader.innerHTML =
-								"<span class='text-red-600'>PDF.js library not loaded.</span>";
-							return;
+							// loader.innerHTML =
+							// 	"<span class='text-red-600'>PDF.js library not loaded.</span>";
+							// return;
 						}
 						pdfjsLib.GlobalWorkerOptions.workerSrc =
 							"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.mjs";
@@ -313,7 +310,12 @@ Redaction Tool{% endblock %} {% block content %}
 		<h3 class="text-lg font-bold text-gray-800 mb-4">Redactions</h3>
 
 		<div class="text-sm text-gray-600 mb-4">
-			<p>Total: <span class="font-semibold">{{ redactions.count }}</span></p>
+			<p>
+				Total:
+				<span id="redaction-count" class="font-semibold"
+					>{{ redactions.count }}</span
+				>
+			</p>
 		</div>
 		{% include "redaction/redaction_list.html" %}
 	</div>

@@ -1,8 +1,10 @@
 from io import BytesIO
 from pathlib import Path
-from datastar_py.django import datastar_response
+from datastar_py.django import DatastarResponse
 from datastar_py.sse import ServerSentEventGenerator as SSE
 import json
+from datastar_py.consts import ElementPatchMode
+from django.forms.models import model_to_dict
 from django.http import FileResponse
 from django.http import HttpResponseBadRequest
 from django.http import JsonResponse
@@ -78,12 +80,10 @@ def redaction_create(request, document_id):  # noqa: ARG001
     document = get_object_or_404(Document, pk=document_id)
 
     try:
-        # TODO: Implement request parsing based on your frontend approach
         data = json.loads(request.body.decode("utf-8"))
         redaction_type = data.get("type")
         coordinates = data.get("coordinates")
         required_fields = {"x", "y", "width", "height", "page"}
-
 
         #JSON validation
         if redaction_type not in ("text", "area"):
@@ -105,15 +105,61 @@ def redaction_create(request, document_id):  # noqa: ARG001
         # Create the redaction
         redaction = Redaction.objects.create(document=document, redaction_type=redaction_type, coordinates=float_coords)
 
+        # Get redaction count after creation
+        redactions_len = len(document.redactions.all())
 
-        # Return appropriate response
-        return render(request, "redaction/notification.html", {
-            "title": redaction.document.title
-        })
+        # Render a single redaction list item as HTML.
+        render_redaction_item = render_to_string(
+            "redaction/redaction_list_item.html",
+            {"redaction": redaction, "document": document}
+        )
 
-    except Exception:
-        return HttpResponseBadRequest()
+        return DatastarResponse([
+            SSE.patch_elements(f"<span id=\"redaction-count\" class=\"font-semibold\">{redactions_len}</span>"),
+            SSE.patch_elements(render_redaction_item,
+                               selector="#redactions-list",
+                               mode=ElementPatchMode.APPEND)
+        ])
 
+    except Exception as e:
+        import traceback
+        print("[redaction_create] Exception:", e)
+        traceback.print_exc()
+        return JsonResponse({"error": str(e)}, status=400)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def redaction_delete(request, document_id, redaction_id):
+    """
+    Delete a redaction for a document.
+    Accepts DELETE requests with JSON or form data:
+    {
+        "document_id": 1,
+        "redaction_id": 1
+    }
+    Returns JSON for frontend reactivity.
+    """
+    document = get_object_or_404(Document, pk=document_id)
+    try:
+        # Fetch redaction by document and redaction ID to delete
+        redaction = Redaction.objects.get(document=document, pk=redaction_id)
+
+        redaction.delete()
+
+        # Get redaction count after deletion
+        redactions_len = len(document.redactions.all())
+
+        return DatastarResponse([
+            SSE.patch_elements(f"<span id=\"redaction-count\" class=\"font-semibold\">{redactions_len}</span>"),
+            SSE.patch_elements(selector="#redaction-item-{}".format(redaction_id),
+                               mode=ElementPatchMode.REMOVE)
+        ])
+
+    except Exception as e:
+        import traceback
+        print("[redaction_create] Exception:", e)
+        traceback.print_exc()
+        return JsonResponse({"error": str(e)}, status=400)
 
 def document_download_redacted(request, document_id):  # noqa: ARG001
     """
