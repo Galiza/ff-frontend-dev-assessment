@@ -1,29 +1,14 @@
-<script type="module">
-	globalThis.emitUpdatedPage = emitUpdatedPage;
-	function emitUpdatedPage(currentPage) {
-		document
-			.getElementById("pdf-signals")
-			.dispatchEvent(updatePagination(currentPage));
-	}
 
-	function updatePagination(page) {
-		return new CustomEvent("paginationchanged", {
-			detail: {
-				page,
-				source: "document-detail-pagination",
-			},
-		});
-	}
-</script>
+
 
 <div
 	class="mt-4 flex items-center justify-center border-t border-gray-200 pt-4 gap-2"
-	data-signals:_pages="{currentPage: 1, totalPages: 1}"
+	data-signals:_pages="{totalPages: 1}"
 >
 	<button
-		data-on:click="if($_pages.currentPage > 1) { $_pages.currentPage--; emitUpdatedPage($_pages.currentPage) }"
-		data-attr:disabled="$_pages.currentPage <= 1"
-		data-class="{'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400': $_pages.currentPage <= 1, 'bg-gray-100 text-gray-700 hover:bg-gray-200': $_pages.currentPage > 1}"
+		data-on:click="$coordinates.page > 1 ? $coordinates.page-- : ''"
+		data-attr:disabled="$coordinates.page <= 1"
+		data-class="{'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400': $coordinates.page <= 1, 'bg-gray-100 text-gray-700 hover:bg-gray-200': $coordinates.page > 1}"
 		class="flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors"
 	>
 		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -38,7 +23,7 @@
 	</button>
 
 	<span class="text-sm text-gray-600">
-		Page <span data-text="$_pages.currentPage" class="font-semibold"></span> of
+		Page <span data-text="$coordinates.page" class="font-semibold"></span> of
 		<span
 			id="totalPages"
 			data-on:totalpagesevent="$_pages.totalPages = evt.detail.totalPages"
@@ -49,9 +34,9 @@
 
 	<button
 		id="next-page"
-		data-on:click="if($_pages.currentPage < $_pages.totalPages) { $_pages.currentPage++; emitUpdatedPage($_pages.currentPage) }"
-		data-attr:disabled="$_pages.currentPage >= $_pages.totalPages"
-		data-class="{'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400': $_pages.currentPage >= $_pages.totalPages, 'bg-gray-100 text-gray-700 hover:bg-gray-200': $_pages.currentPage < $_pages.totalPages}"
+		data-on:click="$coordinates.page < $_pages.totalPages ? $coordinates.page++ : ''"
+		data-attr:disabled="$coordinates.page >= $_pages.totalPages"
+		data-class="{'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400': $coordinates.page >= $_pages.totalPages, 'bg-gray-100 text-gray-700 hover:bg-gray-200': $_pages.currentPage < $_pages.totalPages}"
 		class="flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors"
 	>
 		<span>Next</span>

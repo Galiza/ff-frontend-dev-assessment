@@ -19,10 +19,9 @@ Redaction Tool{% endblock %} {% block content %}
 			class="border border-gray-300 rounded-lg overflow-auto bg-gray-50"
 			style="min-height: 600px"
 			data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1}}"
-			data-on:paginationchanged="evt.detail.source === 'document-detail-pagination' ? $coordinates.page = evt.detail.page  : ''"
-		>
-			<!-- data-on:datastar-fetch="evt.detail.type === 'finished' && console.log('Fetch finished  encountered >> ', evt.detail)" -->
-			<!-- TODO for candidates: Implement PDF.js viewer here -->
+			>
+			{% comment %} data-on:paginationchanged="evt.detail.source === 'document-detail-pagination' ? $coordinates.page = evt.detail.page  : ''" {% endcomment %}
+			{% comment %} data-effect="renderPage($coordinates.page)" {% endcomment %}
 			<!-- Mode Selector -->
 			<div
 				id="modeSelector"
@@ -44,26 +43,27 @@ Redaction Tool{% endblock %} {% block content %}
 					🟩 <span>Area Drawing</span>
 				</button>
 			</div>
-			<div id="pdf-container" class="p-4">
+			<div class="p-4"
+				data-on-signal-patch="renderPage(patch.coordinates.page)"
+				data-on-signal-patch-filter="{include: /^coordinates\.page$/, exclude: /^(_fetching|type)$/}"
+				>
 				<!-- PDF Viewer Container -->
 				{% include "redaction/pdf_loader.html" %}
-				<div id="pdf-viewer" class="h-full"></div>
-
-				<!-- <div
-					id="pdf"
-					style="
-						position: relative;
-						width: 100%;
-						height: 100%;
-						min-height: 400px;
-					"
-				></div> -->
-				<div class="relative">
+				<div id="pdf-container" class="pdfViewer relative">
 					<canvas id="pdf" class="mx-auto border border-gray-300"></canvas>
 					<div
 						id="text-layer"
 						class="textLayer"
-						data-on:mouseup="evt.target.matches('span') ? ($coordinates = {...handleTextSelection(evt), page: $coordinates.page}, @post('/document/{{ document.pk }}/redactions/create/')) : ''"
+						data-on:mouseup="(() => {
+							const sel = handleTextSelection(evt);
+							if (!sel) return;
+							$coordinates.x = sel.x;
+							$coordinates.y = sel.y;
+							$coordinates.width = sel.width;
+							$coordinates.height = sel.height;
+						})()"
+						data-on-signal-patch="($coordinates.width && $coordinates.height) && @post('/document/{{ document.pk }}/redactions/create/')"
+						data-on-signal-patch-filter="{exclude: /^(coordinates.page|_fetching|type)$/ }"
 					></div>
 				</div>
 
@@ -80,44 +80,63 @@ Redaction Tool{% endblock %} {% block content %}
 					const ctx = canvas.getContext("2d");
 					const textLayer = document.getElementById("text-layer");
 					const buttons = document.querySelectorAll(".mode-btn");
-
-					const pdfContainer = document.getElementById("pdf");
+					const loader = document.getElementById("pdf-loader");
+					const pdfContainer = document.getElementById("pdf-container");
 
 					// Setup of PDF.js worker
-					await initPDF();
-
-					function handleTextSelection(event) {
+					initPDF();
+					
+					function handleTextSelection() {
 						const selection = globalThis.getSelection();
-						if (!selection.toString().trim()) return;
+						if (!selection.rangeCount || selection.isCollapsed) {
+							return null;
+						}
 
 						const range = selection.getRangeAt(0);
-						const rect = range.getBoundingClientRect();
+						const rects = range.getClientRects();
+						// Use the textLayer as the reference for coordinates
+						const textLayer = document.getElementById('text-layer');
 						const containerRect = textLayer.getBoundingClientRect();
 
-						const x = rect.left - containerRect.left;
-						const y = rect.top - containerRect.top;
-						const width = rect.width;
-						const height = rect.height;
-						console.log("Selection coords:", { x, y, width, height });
-						return { x, y, width, height };
+						// If no rects, return null
+						if (!rects.length) return null;
+
+						// Find the bounding box that contains all rects (across lines)
+						let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+						for (const rect of rects) {
+							const x = rect.left - containerRect.left;
+							const y = rect.top - containerRect.top;
+							const right = rect.right - containerRect.left;
+							const bottom = rect.bottom - containerRect.top;
+							if (x < minX) minX = x;
+							if (y < minY) minY = y;
+							if (right > maxX) maxX = right;
+							if (bottom > maxY) maxY = bottom;
+						}
+						const width = maxX - minX;
+						const height = maxY - minY;
+
+						// Only return if selection is visible and has area
+						if (width > 0 && height > 0) {
+							return { x: minX, y: minY, width, height };
+						}
+						//return null;
 					}
 
-					globalThis.handleTextSelection = handleTextSelection;
-
 					// Initialize PDF
-					async function initPDF() {
+					function initPDF() {
 						if (typeof pdfjsLib === "undefined") {
-							// loader.innerHTML =
-							// 	"<span class='text-red-600'>PDF.js library not loaded.</span>";
-							// return;
+							loader.innerHTML = "<span class='text-red-600'>PDF.js library not loaded.</span>";
+							return;
 						}
-						pdfjsLib.GlobalWorkerOptions.workerSrc =
-							"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.mjs";
+						loader.style.display = "block";
+						canvas.style.display = "none";
 
-						try {
-							const loadingTask = pdfjsLib.getDocument(pdfUrl);
-							pdf = await loadingTask.promise;
-							globalThis.pdfTotalPages = pdf.numPages;
+						pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.mjs";
+
+						const loadingTask = pdfjsLib.getDocument(pdfUrl);
+						loadingTask.promise.then((loadedPdf) => {
+							pdf = loadedPdf;
 							document.getElementById("totalPages").dispatchEvent(
 								new CustomEvent("totalpagesevent", {
 									detail: {
@@ -125,104 +144,68 @@ Redaction Tool{% endblock %} {% block content %}
 									},
 								})
 							);
-
-							// Render all pages
-							// for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-							//     await renderPage(pageNum);
-							// }
-
-							// Hide loader
-							// document.getElementById("pdf-loader").classList.add("hidden");
-
-							// Load existing redactions
-							// await loadRedactions();
-
 							// Load initial page
-							await renderPage(1);
-						} catch (error) {
+							renderPage(1);
+						}).catch(function(error) {
 							console.error("Error loading PDF:", error);
-							document.getElementById("pdf-loader").innerHTML =
-								'<span class="text-red-600">Failed to load PDF</span>';
-						}
-					}
-
-					// Start listening to event from pagination controls
-					document
-						.getElementById("pdf-signals")
-						.addEventListener("paginationchanged", async (e) => {
-							if (e.detail.source !== "document-detail-pagination") {
-								return;
-							}
-							await renderPage(e.detail.page);
+							document.getElementById("pdf-loader").innerHTML = '<span class="text-red-600">Failed to load PDF</span>';
 						});
+					}
 
 					// Initialize update mode
-					async function renderPage(pageNum) {
-						const page = await pdf.getPage(pageNum);
+					function renderPage(pageNum) {
+						pdf.getPage(pageNum).then((page) => {
+							const viewport = page.getViewport({ scale: 1.5 });
+							pdfContainer.style.setProperty('--scale-factor', viewport.scale);
+							canvas.height = viewport.height;
+							canvas.width = viewport.width;
+							const renderContext = {
+								canvasContext: ctx,
+								viewport: viewport,
+							};
 
-						const viewport = page.getViewport({ scale: 1.5 });
-						canvas.height = viewport.height;
-						canvas.width = viewport.width;
-						const renderContext = {
-							canvasContext: ctx,
-							viewport: viewport,
-						};
-
-						await page.render(renderContext).promise;
-
-						const textContent = await page.getTextContent();
-
-						textLayer.innerHTML = "";
-						textLayer.style.position = "absolute";
-						textLayer.style.top = 0;
-						textLayer.style.width = "100%";
-
-						for (const item of textContent.items) {
-							if (item.str === " ") continue;
-							const tx = pdfjsLib.Util.transform(
-								viewport.transform,
-								item.transform
-							);
-
-							const span = document.createElement("span");
-							span.textContent = item.str;
-							span.style.left = `${tx[4]}px`;
-							span.style.top = `${tx[5] - item.height - 1}px`;
-							span.style.fontSize = `${Math.hypot(tx[0], tx[1]) + 1}px`;
-							span.style.position = "absolute";
-							span.style.color = "transparent";
-
-							textLayer.appendChild(span);
-						}
-						loader.style.display = "none";
-						canvas.style.display = "block";
+							page.render(renderContext).promise.then(() => {
+								page.getTextContent().then((textContent) => {
+									pdfjsLib.renderTextLayer({
+										textContentSource: textContent,
+										viewport,
+										container: textLayer,
+										textDivs: []
+									});
+									
+									loader.style.display = "none";
+									canvas.style.display = "block";
+								});
+							});
+						});
 					}
 
-					// function updateMode(mode) {
-					// 	redactionMode = mode;
+					function getSelectionRects() {
+						const selection = globalThis.getSelection();
+						if (!selection.rangeCount || selection.isCollapsed) {
+							return [];
+						}
 
-					// 	buttons.forEach((btn) => {
-					// 		if (btn.dataset.mode === mode) {
-					// 			btn.classList.add(
-					// 				"bg-blue-600",
-					// 				"text-white",
-					// 				"shadow-inner"
-					// 			);
-					// 			btn.classList.remove("bg-white", "text-gray-800");
-					// 		} else {
-					// 			btn.classList.remove(
-					// 				"bg-blue-600",
-					// 				"text-white",
-					// 				"shadow-inner",
-					// 				"scale-105"
-					// 			);
-					// 			btn.classList.add("bg-white", "text-gray-800");
-					// 		}
-					// 	});
-					// }
-					// for (const btn of buttons) {
-					// 	btn.addEventListener("click", () => updateMode(btn.dataset.mode));
-					// }
+						const range = selection.getRangeAt(0);
+						const rects = range.getClientRects();
+						const viewerRect = document.getElementById('viewer').getBoundingClientRect();
+						
+						const normalizedRects = [];
+						for (const element of rects) {
+							const rect = element;
+							normalizedRects.push({
+								x: rect.left - viewerRect.left,
+								y: rect.top - viewerRect.top,
+								width: rect.width,
+								height: rect.height
+							});
+						}
+						
+						return normalizedRects;
+					}
+					globalThis.handleTextSelection = handleTextSelection;
+					globalThis.renderPage = renderPage;
+
 
 					// function handleTextSelection(e) {
 					// Check if we're in text mode
