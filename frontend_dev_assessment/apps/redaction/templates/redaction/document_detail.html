@@ -19,7 +19,7 @@ Redaction Tool{% endblock %} {% block content %}
 			class="border border-gray-300 rounded-lg overflow-auto bg-gray-50"
 			style="min-height: 600px"
 			data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1}}"
-			>
+		>
 			{% comment %} data-on:paginationchanged="evt.detail.source === 'document-detail-pagination' ? $coordinates.page = evt.detail.page  : ''" {% endcomment %}
 			{% comment %} data-effect="renderPage($coordinates.page)" {% endcomment %}
 			<!-- Mode Selector -->
@@ -51,20 +51,26 @@ Redaction Tool{% endblock %} {% block content %}
 				{% include "redaction/pdf_loader.html" %}
 				<div id="pdf-container" class="pdfViewer relative">
 					<canvas id="pdf" class="mx-auto border border-gray-300"></canvas>
-					<div
-						id="text-layer"
+					<div class="annotationLayer"></div>
+					<div id="text-layer"
 						class="textLayer"
-						data-on:mouseup="(() => {
-							const sel = handleTextSelection(evt);
-							if (!sel) return;
-							$coordinates.x = sel.x;
-							$coordinates.y = sel.y;
-							$coordinates.width = sel.width;
-							$coordinates.height = sel.height;
-						})()"
-						data-on-signal-patch="($coordinates.width && $coordinates.height) && @post('/document/{{ document.pk }}/redactions/create/')"
-						data-on-signal-patch-filter="{exclude: /^(coordinates.page|_fetching|type)$/ }"
+						data-show="$type === 'text'"
+						data-on:mouseup="
+							if (evt.target.matches('span') && handleTextSelection(evt)?.length) {
+								for (const sel of handleTextSelection(evt)) {
+									setTimeout(() => {
+										if (!sel) return;
+										$coordinates.x = sel.x;
+										$coordinates.y = sel.y;
+										$coordinates.width = sel.width;
+										$coordinates.height = sel.height;
+										@post('/document/{{ document.pk }}/redactions/create/');
+									}, 100);
+								}
+							}
+						"
 					></div>
+					<canvas class="absolute top-[0px] left-[0px]" data-show="$type === 'area'" id="drawing-canvas"></canvas>
 				</div>
 
 				{% include "redaction/pagination.html" %}
@@ -72,9 +78,12 @@ Redaction Tool{% endblock %} {% block content %}
 					let pdf = null;
 					let pageRendering = false;
 					let pageNumPending = null;
+					let viewport = null;
 					let redactionsData = [];
+					const VIEWPORT_SCALE = 1.5;
 
 					const pdfUrl = "{{ document.file.url }}";
+					const redactions = {{redactions_json|safe}};
 
 					const canvas = document.getElementById("pdf");
 					const ctx = canvas.getContext("2d");
@@ -82,46 +91,12 @@ Redaction Tool{% endblock %} {% block content %}
 					const buttons = document.querySelectorAll(".mode-btn");
 					const loader = document.getElementById("pdf-loader");
 					const pdfContainer = document.getElementById("pdf-container");
+					const drawingCanvas = document.getElementById("drawing-canvas");
+					
+					pdfContainer.style.setProperty('--scale-factor', VIEWPORT_SCALE);
 
 					// Setup of PDF.js worker
 					initPDF();
-					
-					function handleTextSelection() {
-						const selection = globalThis.getSelection();
-						if (!selection.rangeCount || selection.isCollapsed) {
-							return null;
-						}
-
-						const range = selection.getRangeAt(0);
-						const rects = range.getClientRects();
-						// Use the textLayer as the reference for coordinates
-						const textLayer = document.getElementById('text-layer');
-						const containerRect = textLayer.getBoundingClientRect();
-
-						// If no rects, return null
-						if (!rects.length) return null;
-
-						// Find the bounding box that contains all rects (across lines)
-						let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-						for (const rect of rects) {
-							const x = rect.left - containerRect.left;
-							const y = rect.top - containerRect.top;
-							const right = rect.right - containerRect.left;
-							const bottom = rect.bottom - containerRect.top;
-							if (x < minX) minX = x;
-							if (y < minY) minY = y;
-							if (right > maxX) maxX = right;
-							if (bottom > maxY) maxY = bottom;
-						}
-						const width = maxX - minX;
-						const height = maxY - minY;
-
-						// Only return if selection is visible and has area
-						if (width > 0 && height > 0) {
-							return { x: minX, y: minY, width, height };
-						}
-						//return null;
-					}
 
 					// Initialize PDF
 					function initPDF() {
@@ -155,10 +130,11 @@ Redaction Tool{% endblock %} {% block content %}
 					// Initialize update mode
 					function renderPage(pageNum) {
 						pdf.getPage(pageNum).then((page) => {
-							const viewport = page.getViewport({ scale: 1.5 });
-							pdfContainer.style.setProperty('--scale-factor', viewport.scale);
+							viewport = page.getViewport({ scale: VIEWPORT_SCALE });
 							canvas.height = viewport.height;
 							canvas.width = viewport.width;
+							drawingCanvas.height = viewport.height;
+							drawingCanvas.width = viewport.width;
 							const renderContext = {
 								canvasContext: ctx,
 								viewport: viewport,
@@ -172,108 +148,127 @@ Redaction Tool{% endblock %} {% block content %}
 										container: textLayer,
 										textDivs: []
 									});
-									
+
 									loader.style.display = "none";
 									canvas.style.display = "block";
 								});
 							});
+
 						});
 					}
 
-					function getSelectionRects() {
+					function initializeSavedRedactions(pageNum) {
+						// remove any existing redaction boxes
+						const existingRedactions = pdfContainer.querySelectorAll('[id^="redaction-"]');
+
+						if (redactions.length) {
+							// Draw saved redactions for the current page
+							for (let redaction of redactions) {
+								if (redaction.coordinates.page === pageNum) {
+									const coords = redaction.coordinates;
+									// Convert PDF coordinates to screen coordinates
+									const screenX = coords.x * VIEWPORT_SCALE;
+									const screenY = coords.y * VIEWPORT_SCALE;
+									const screenWidth = coords.width * VIEWPORT_SCALE;
+									const screenHeight = coords.height * VIEWPORT_SCALE;
+									
+									drawSavedRedactionsBox(redaction.id, screenX, screenY, screenWidth, screenHeight);
+								}
+							}
+							console.log('existing redactions:', existingRedactions);
+						}
+					}
+					
+					function handleTextSelection() {
 						const selection = globalThis.getSelection();
-						if (!selection.rangeCount || selection.isCollapsed) {
+
+						if (selection.rangeCount > 0 && !selection.isCollapsed) {
+							const range = selection.getRangeAt(0);
+							const selectedText = selection.toString();
+							
+							// Get the actual selection rectangles
+							const rects = range.getClientRects();
+							
+							if (rects.length > 0) {
+								const textLayerRect = textLayer.getBoundingClientRect();
+								
+								// Convert each rectangle individually
+								const redactionBoxes = Array.from(rects)
+									.filter(rect => rect.width > 0 && rect.height > 0)
+									.map(rect => {
+										// Screen coordinates relative to text layer
+										const relativeX = rect.left - textLayerRect.left;
+										const relativeY = rect.top - textLayerRect.top;
+										
+										// Scaled box (for drawing on screen)
+										const scaledBox = {
+											x: relativeX,
+											y: relativeY,
+											width: rect.width,
+											height: rect.height
+										};
+										
+										// Unscaled box (for backend)
+										const unscaledBox = {
+											x: relativeX / VIEWPORT_SCALE,
+											y: relativeY / VIEWPORT_SCALE,
+											width: rect.width / VIEWPORT_SCALE,
+											height: rect.height / VIEWPORT_SCALE
+										};
+										
+										return {
+											scaled: scaledBox,
+											unscaled: unscaledBox
+										};
+									});
+								
+									console.log(redactionBoxes.length);
+								return redactionBoxes.map(box => box.unscaled);
+							}
 							return [];
 						}
+						return [];
+					}
 
-						const range = selection.getRangeAt(0);
-						const rects = range.getClientRects();
-						const viewerRect = document.getElementById('viewer').getBoundingClientRect();
+					function drawSavedRedactionsBox(id, x, y, width, height) {
+						const redactionDiv = document.createElement('div');
+						redactionDiv.setAttribute('id', `redaction-${id}`);
+						redactionDiv.style.position = 'absolute';
+						redactionDiv.style.left = x + 'px';
+						redactionDiv.style.top = y + 'px';
+						redactionDiv.style.width = width + 'px';
+						redactionDiv.style.height = height + 'px';
+						redactionDiv.style.backgroundColor = 'black';
+						redactionDiv.style.zIndex = '10';
 						
-						const normalizedRects = [];
-						for (const element of rects) {
-							const rect = element;
-							normalizedRects.push({
-								x: rect.left - viewerRect.left,
-								y: rect.top - viewerRect.top,
-								width: rect.width,
-								height: rect.height
-							});
+						pdfContainer.appendChild(redactionDiv);
+					}
+
+					// Another helper function at the same level
+					function getSelectedTextSpans(range) {
+						const selectedSpans = [];
+						const spans = textLayer.querySelectorAll('span');
+						
+						for (const span of spans) {
+							const spanRange = document.createRange();
+							spanRange.selectNodeContents(span);
+							
+							if (range.intersectsNode(span)) {
+								const rect = span.getBoundingClientRect();
+								selectedSpans.push({
+									element: span,
+									text: span.textContent,
+									bounds: rect
+								});
+							}
 						}
 						
-						return normalizedRects;
+						return selectedSpans;
 					}
+
 					globalThis.handleTextSelection = handleTextSelection;
 					globalThis.renderPage = renderPage;
-
-
-					// function handleTextSelection(e) {
-					// Check if we're in text mode
-					// const store = globalThis.store || {};
-					// if (store.mode !== "text") return;
-					// redactionMode === "text"
-
-					// console.log(e);
-					// console.log(globalThis.getSelection());
-
-					// 	const selection = globalThis.getSelection();
-					// 	if (!selection.toString().trim()) return;
-
-					// 	const range = selection.getRangeAt(0);
-					// 	const rect = range.getBoundingClientRect();
-					// 	const containerRect = textLayer.getBoundingClientRect();
-
-					// 	const x = rect.left - containerRect.left;
-					// 	const y = rect.top - containerRect.top;
-					// 	const width = rect.width;
-					// 	const height = rect.height;
-
-					// 	// if (width > 0 && height > 0) {
-					// 	console.log("text >> ", { x, y, width, height });
-					// 	// 	// selection.removeAllRanges();
-					// 	// }
-					// }
-					// });
 				</script>
-				<!-- <div class="text-center py-12 text-gray-500">
-					<svg
-						class="mx-auto h-16 w-16 text-gray-400 mb-4"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-						/>
-					</svg>
-					<p class="text-lg font-medium">PDF Viewer Placeholder</p>
-					<p class="text-sm mt-2">Implement PDF.js viewer here to display:</p>
-					<p class="text-sm font-mono mt-1">{{ document.file.url }}</p>
-					<div
-						class="mt-4 text-left max-w-md mx-auto bg-yellow-50 border border-yellow-200 rounded p-4"
-					>
-						<p class="font-semibold text-yellow-900 mb-2">
-							Implementation Steps:
-						</p>
-						<ol
-							class="list-decimal list-inside text-sm text-yellow-800 space-y-1"
-						>
-							<li>Load PDF.js library (already included in base.html)</li>
-							<li>Fetch and render PDF from the URL above</li>
-							<li>Add mouse event handlers for selection/drawing</li>
-							<li>
-								Send redaction data to:
-								<code class="bg-yellow-100 px-1 rounded"
-									>{% url 'redaction:redaction_create' document.pk %}</code
-								>
-							</li>
-							<li>Use DataStar to update the redactions list dynamically</li>
-						</ol>
-					</div>
-				</div> -->
 			</div>
 		</div>
 

@@ -37,12 +37,27 @@ def document_detail(request, pk):
     document = get_object_or_404(Document, pk=pk)
     redactions = document.redactions.all()
 
+
+    if len(redactions) == 0:
+        redactions_json = "[]"
+    else:
+        redactions_json = json.dumps([
+            {
+                "id": r.id,
+                "type": r.redaction_type,
+                "coordinates": r.coordinates,
+            # add more fields as needed
+        }
+        for r in redactions
+    ])
+
     return render(
         request,
         "redaction/document_detail.html",
         {
             "document": document,
             "redactions": redactions,
+            "redactions_json": redactions_json,
         },
     )
 
@@ -105,21 +120,49 @@ def redaction_create(request, document_id):  # noqa: ARG001
         # Create the redaction
         redaction = Redaction.objects.create(document=document, redaction_type=redaction_type, coordinates=float_coords)
 
-        # Get redaction count after creation
+        # Get redaction size after creation
         redactions_len = len(document.redactions.all())
 
-        # Render a single redaction list item as HTML.
-        render_redaction_item = render_to_string(
+        # Get all redactions for the document
+        redactions = document.redactions.all()
+        
+        redaction_list_item_html = render_to_string(
             "redaction/redaction_list_item.html",
             {"redaction": redaction, "document": document}
         )
+        
+        redaction_drawing_black_square = (
+            f'<div id="redaction-{redaction.id}"'
+            f'data-show="$coordinates.page === {redaction.coordinates["page"]}" '
+            f'class="absolute '
+            f'left-[calc({redaction.coordinates["x"]}px*var(--scale-factor))] '
+            f'top-[calc({redaction.coordinates["y"]}px*var(--scale-factor))] '
+            f'w-[calc({redaction.coordinates["width"]}px*var(--scale-factor))] '
+            f'h-[calc({redaction.coordinates["height"]}px*var(--scale-factor))] '
+            f'bg-black ' 
+            f'z-10"></div>'
+        )
 
-        return DatastarResponse([
+        elements_to_patch = [
             SSE.patch_elements(f"<span id=\"redaction-count\" class=\"font-semibold\">{redactions_len}</span>"),
-            SSE.patch_elements(render_redaction_item,
+            SSE.patch_elements(redaction_list_item_html,
                                selector="#redactions-list",
-                               mode=ElementPatchMode.APPEND)
-        ])
+                                mode=ElementPatchMode.APPEND),
+            SSE.patch_elements(redaction_drawing_black_square,
+                                selector="#pdf-container",
+                                mode=ElementPatchMode.APPEND)
+        ]
+
+        if redactions_len > 0:
+            elements_to_patch.append(
+                SSE.patch_elements(
+                    "",
+                    selector="#empty-redactions",
+                    mode=ElementPatchMode.REMOVE
+                )
+            )
+
+        return DatastarResponse(elements_to_patch)
 
     except Exception as e:
         import traceback
@@ -144,16 +187,32 @@ def redaction_delete(request, document_id, redaction_id):
         # Fetch redaction by document and redaction ID to delete
         redaction = Redaction.objects.get(document=document, pk=redaction_id)
 
+        # Create selector for overlay and list item before deleting
+        overlay_selector = f"#redaction-{redaction.id}"
+        list_item_selector = f"#redaction-item-{redaction.id}"
+
+        # Delete redaction
         redaction.delete()
 
-        # Get redaction count after deletion
+        # Get redaction size after deletion
         redactions_len = len(document.redactions.all())
 
-        return DatastarResponse([
+        elements_to_patch = [
             SSE.patch_elements(f"<span id=\"redaction-count\" class=\"font-semibold\">{redactions_len}</span>"),
-            SSE.patch_elements(selector="#redaction-item-{}".format(redaction_id),
-                               mode=ElementPatchMode.REMOVE)
-        ])
+            SSE.patch_elements(selector=overlay_selector, mode=ElementPatchMode.REMOVE),
+            SSE.patch_elements(selector=list_item_selector, mode=ElementPatchMode.REMOVE)
+        ]
+
+        if redactions_len == 0:
+            elements_to_patch.append(
+                SSE.patch_elements(
+                    render_to_string("redaction/empty_redaction_list.html"),
+                    selector="#redactions-list",
+                    mode=ElementPatchMode.APPEND
+                )
+            )
+
+        return DatastarResponse(elements_to_patch)
 
     except Exception as e:
         import traceback
