@@ -137,7 +137,7 @@ def redaction_create(request, document_id):  # noqa: ARG001
             f'class="absolute '
             f'left-[calc({redaction.coordinates["x"]}px*var(--scale-factor))] '
             f'top-[calc({redaction.coordinates["y"]}px*var(--scale-factor))] '
-            f'w-[calc({redaction.coordinates["width"]}px*var(--scale-factor))] '
+            f'w-[calc({redaction.coordinates["width"]}px*var(--scale-factor)+1px)] '
             f'h-[calc({redaction.coordinates["height"]}px*var(--scale-factor))] '
             f'bg-black ' 
             f'z-10"></div>'

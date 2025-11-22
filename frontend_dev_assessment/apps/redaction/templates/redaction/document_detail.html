@@ -51,7 +51,11 @@ Redaction Tool{% endblock %} {% block content %}
 				{% include "redaction/pdf_loader.html" %}
 				<div id="pdf-container" class="pdfViewer relative">
 					<canvas id="pdf" class="mx-auto border border-gray-300"></canvas>
-					<div class="annotationLayer"></div>
+					<div class="annotationLayer">
+						{% for redaction in redactions %}
+							{% include "redaction/redaction_overlay_block.html" %}
+						{% endfor %}
+					</div>
 					<div id="text-layer"
 						class="textLayer"
 						data-show="$type === 'text'"
@@ -79,11 +83,9 @@ Redaction Tool{% endblock %} {% block content %}
 					let pageRendering = false;
 					let pageNumPending = null;
 					let viewport = null;
-					let redactionsData = [];
 					const VIEWPORT_SCALE = 1.5;
 
 					const pdfUrl = "{{ document.file.url }}";
-					const redactions = {{redactions_json|safe}};
 
 					const canvas = document.getElementById("pdf");
 					const ctx = canvas.getContext("2d");
@@ -142,6 +144,12 @@ Redaction Tool{% endblock %} {% block content %}
 
 							page.render(renderContext).promise.then(() => {
 								page.getTextContent().then((textContent) => {
+									// Clear existing text layer
+									textLayer.innerHTML = "";
+
+									// Group text content items into lines as textContent can sometimes contain fragmented pieces
+									textContent.items = groupTextContentItems(textContent.items);
+
 									pdfjsLib.renderTextLayer({
 										textContentSource: textContent,
 										viewport,
@@ -157,28 +165,6 @@ Redaction Tool{% endblock %} {% block content %}
 						});
 					}
 
-					function initializeSavedRedactions(pageNum) {
-						// remove any existing redaction boxes
-						const existingRedactions = pdfContainer.querySelectorAll('[id^="redaction-"]');
-
-						if (redactions.length) {
-							// Draw saved redactions for the current page
-							for (let redaction of redactions) {
-								if (redaction.coordinates.page === pageNum) {
-									const coords = redaction.coordinates;
-									// Convert PDF coordinates to screen coordinates
-									const screenX = coords.x * VIEWPORT_SCALE;
-									const screenY = coords.y * VIEWPORT_SCALE;
-									const screenWidth = coords.width * VIEWPORT_SCALE;
-									const screenHeight = coords.height * VIEWPORT_SCALE;
-									
-									drawSavedRedactionsBox(redaction.id, screenX, screenY, screenWidth, screenHeight);
-								}
-							}
-							console.log('existing redactions:', existingRedactions);
-						}
-					}
-					
 					function handleTextSelection() {
 						const selection = globalThis.getSelection();
 
@@ -222,7 +208,6 @@ Redaction Tool{% endblock %} {% block content %}
 										};
 									});
 								
-									console.log(redactionBoxes.length);
 								return redactionBoxes.map(box => box.unscaled);
 							}
 							return [];
@@ -244,26 +229,55 @@ Redaction Tool{% endblock %} {% block content %}
 						pdfContainer.appendChild(redactionDiv);
 					}
 
-					// Another helper function at the same level
-					function getSelectedTextSpans(range) {
-						const selectedSpans = [];
-						const spans = textLayer.querySelectorAll('span');
-						
-						for (const span of spans) {
-							const spanRange = document.createRange();
-							spanRange.selectNodeContents(span);
-							
-							if (range.intersectsNode(span)) {
-								const rect = span.getBoundingClientRect();
-								selectedSpans.push({
-									element: span,
-									text: span.textContent,
-									bounds: rect
-								});
+					function groupTextContentItems(items) {
+						const groupedItems = [];
+						let buffer = [];
+						let lastY = null;
+						for (const item of items) {
+							buffer.push(item);
+							if (item.hasEOL) {
+								// Join all buffered items into one line
+								const joinedStr = buffer.map(i => i.str).join('');
+								const left = item.str === '' ? Math.max(...buffer.map(i => i.transform[4])) : Math.min(...buffer.map(i => i.transform[4]));
+								const top = item.str === '' ? Math.max(...buffer.map(i => i.transform[5])) : Math.min(...buffer.map(i => i.transform[5]));
+								const right = Math.max(...buffer.map(i => i.transform[4] + i.width));
+								const height = Math.max(...buffer.map(i => i.height));
+								const width = right - left;
+								const newItem = {
+									...buffer[0],
+									str: joinedStr,
+									hasEOL: true,
+									width: width,
+									height: height,
+									transform: [...buffer[0].transform],
+								};
+								newItem.transform[4] = left;
+								newItem.transform[5] = top;
+								groupedItems.push(newItem);
+								buffer = [];
 							}
 						}
-						
-						return selectedSpans;
+						// If any items left in buffer (no EOL at end), join them too
+						if (buffer.length) {
+							const joinedStr = buffer.map(i => i.str).join('');
+							const left = Math.min(...buffer.map(i => i.transform[4]));
+							const top = Math.min(...buffer.map(i => i.transform[5]));
+							const right = Math.max(...buffer.map(i => i.transform[4] + i.width));
+							const height = Math.max(...buffer.map(i => i.height));
+							const width = right - left;
+							const newItem = {
+								...buffer[0],
+								str: joinedStr,
+								hasEOL: false,
+								width: width,
+								height: height,
+								transform: [...buffer[0].transform],
+							};
+							newItem.transform[4] = left;
+							newItem.transform[5] = top;
+							groupedItems.push(newItem);
+						}
+						return groupedItems;
 					}
 
 					globalThis.handleTextSelection = handleTextSelection;
