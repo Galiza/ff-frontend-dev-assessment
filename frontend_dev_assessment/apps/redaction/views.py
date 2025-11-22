@@ -56,8 +56,7 @@ def document_detail(request, pk):
         "redaction/document_detail.html",
         {
             "document": document,
-            "redactions": redactions,
-            "redactions_json": redactions_json,
+            "redactions": redactions
         },
     )
 
@@ -122,9 +121,6 @@ def redaction_create(request, document_id):  # noqa: ARG001
 
         # Get redaction size after creation
         redactions_len = len(document.redactions.all())
-
-        # Get all redactions for the document
-        redactions = document.redactions.all()
         
         redaction_list_item_html = render_to_string(
             "redaction/redaction_list_item.html",
@@ -149,11 +145,11 @@ def redaction_create(request, document_id):  # noqa: ARG001
                                selector="#redactions-list",
                                 mode=ElementPatchMode.APPEND),
             SSE.patch_elements(redaction_drawing_black_square,
-                                selector="#pdf-container",
+                                selector="#annotation-layer",
                                 mode=ElementPatchMode.APPEND)
         ]
 
-        if redactions_len > 0:
+        if redactions_len == 0:
             elements_to_patch.append(
                 SSE.patch_elements(
                     "",

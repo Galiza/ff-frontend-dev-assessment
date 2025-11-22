@@ -50,8 +50,9 @@ Redaction Tool{% endblock %} {% block content %}
 				<!-- PDF Viewer Container -->
 				{% include "redaction/pdf_loader.html" %}
 				<div id="pdf-container" class="pdfViewer relative">
+					{% comment %} {% set action = "@post('/document/{{ document.pk }}/redactions/create/')" %} {% endcomment %}
 					<canvas id="pdf" class="mx-auto border border-gray-300"></canvas>
-					<div class="annotationLayer">
+					<div id="annotation-layer">
 						{% for redaction in redactions %}
 							{% include "redaction/redaction_overlay_block.html" %}
 						{% endfor %}
@@ -74,19 +75,33 @@ Redaction Tool{% endblock %} {% block content %}
 							}
 						"
 					></div>
-					<canvas class="absolute top-[0px] left-[0px]" data-show="$type === 'area'" id="drawing-canvas"></canvas>
+					<canvas class="absolute top-[0px] left-[0px] z-5" 
+						data-show="$type === 'area'" id="drawing-canvas"
+						data-indicator:_creating
+						data-on:mousedown="startDrawing(evt)"
+						data-on:mousemove="drawRectanglePreview(evt)"
+						data-on:mouseup="
+							const sel = stopDrawing(evt);
+							$coordinates.x = sel.x;
+							$coordinates.y = sel.y;
+							$coordinates.width = sel.width;
+							$coordinates.height = sel.height;
+							@post('/document/{{ document.pk }}/redactions/create/');"
+						data-on-signal-patch="!patch._creating ? clearDrawingCanvas() : ''"
+						data-on-signal-patch-filter="{include: /^_creating/}"
+					></canvas>
 				</div>
 
 				{% include "redaction/pagination.html" %}
 				<script type="module">
+					// PDFJs variables
 					let pdf = null;
-					let pageRendering = false;
-					let pageNumPending = null;
 					let viewport = null;
-					const VIEWPORT_SCALE = 1.5;
-
+					
+					// Get PDF URL sent by the backend
 					const pdfUrl = "{{ document.file.url }}";
-
+					
+					// Get reference of DOM Elements
 					const canvas = document.getElementById("pdf");
 					const ctx = canvas.getContext("2d");
 					const textLayer = document.getElementById("text-layer");
@@ -94,8 +109,17 @@ Redaction Tool{% endblock %} {% block content %}
 					const loader = document.getElementById("pdf-loader");
 					const pdfContainer = document.getElementById("pdf-container");
 					const drawingCanvas = document.getElementById("drawing-canvas");
+					const drawingCtx = drawingCanvas.getContext("2d");
 					
+					// Setting scale factor for redaction boxes - this can be used in future implementation for zoom functionality
+					const VIEWPORT_SCALE = 1.5;
 					pdfContainer.style.setProperty('--scale-factor', VIEWPORT_SCALE);
+
+					// Drawing state
+					let isDrawing = false;
+					let startX = 0;
+					let startY = 0;
+					let currentRect = null;
 
 					// Setup of PDF.js worker
 					initPDF();
@@ -170,7 +194,6 @@ Redaction Tool{% endblock %} {% block content %}
 
 						if (selection.rangeCount > 0 && !selection.isCollapsed) {
 							const range = selection.getRangeAt(0);
-							const selectedText = selection.toString();
 							
 							// Get the actual selection rectangles
 							const rects = range.getClientRects();
@@ -186,14 +209,6 @@ Redaction Tool{% endblock %} {% block content %}
 										const relativeX = rect.left - textLayerRect.left;
 										const relativeY = rect.top - textLayerRect.top;
 										
-										// Scaled box (for drawing on screen)
-										const scaledBox = {
-											x: relativeX,
-											y: relativeY,
-											width: rect.width,
-											height: rect.height
-										};
-										
 										// Unscaled box (for backend)
 										const unscaledBox = {
 											x: relativeX / VIEWPORT_SCALE,
@@ -203,7 +218,6 @@ Redaction Tool{% endblock %} {% block content %}
 										};
 										
 										return {
-											scaled: scaledBox,
 											unscaled: unscaledBox
 										};
 									});
@@ -215,19 +229,87 @@ Redaction Tool{% endblock %} {% block content %}
 						return [];
 					}
 
-					function drawSavedRedactionsBox(id, x, y, width, height) {
-						const redactionDiv = document.createElement('div');
-						redactionDiv.setAttribute('id', `redaction-${id}`);
-						redactionDiv.style.position = 'absolute';
-						redactionDiv.style.left = x + 'px';
-						redactionDiv.style.top = y + 'px';
-						redactionDiv.style.width = width + 'px';
-						redactionDiv.style.height = height + 'px';
-						redactionDiv.style.backgroundColor = 'black';
-						redactionDiv.style.zIndex = '10';
+					// Initialize drawing event for area mode
+					function startDrawing(e) {
+						 if (drawingCanvas.style.display === 'none') {
+							return; // Don't draw if canvas is hidden (not in area mode)
+						}
 						
-						pdfContainer.appendChild(redactionDiv);
+						const rect = drawingCanvas.getBoundingClientRect();
+						startX = e.clientX - rect.left;
+						startY = e.clientY - rect.top;
+						isDrawing = true;
+						
+						// Clear any previous temporary rectangle
+						drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 					}
+
+					function drawRectanglePreview(e) {
+						if (!isDrawing) return;
+        
+						const rect = drawingCanvas.getBoundingClientRect();
+						const currentX = e.clientX - rect.left;
+						const currentY = e.clientY - rect.top;
+						
+						// Clear canvas and redraw rectangle
+						drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+						
+						const width = currentX - startX;
+						const height = currentY - startY;
+						
+						// Draw rectangle preview with semi-transparent black fill and border
+						drawingCtx.fillStyle = 'rgba(0, 0, 0, 1)';
+						drawingCtx.strokeStyle = 'rgba(0, 0, 0, 1)';
+						drawingCtx.lineWidth = 2;
+						
+						drawingCtx.fillRect(startX, startY, width, height);
+						drawingCtx.strokeRect(startX, startY, width, height);
+					}
+
+					function stopDrawing(e) {
+						if (!isDrawing) return;
+        
+						const rect = drawingCanvas.getBoundingClientRect();
+						const endX = e.clientX - rect.left;
+						const endY = e.clientY - rect.top;
+						
+						// Calculate rectangle dimensions
+						let width = endX - startX;
+						let height = endY - startY;
+						let x = startX;
+						let y = startY;
+						
+						// Normalize coordinates if drawn right-to-left or bottom-to-top
+						if (width < 0) {
+							x = endX;
+							width = Math.abs(width);
+						}
+						if (height < 0) {
+							y = endY;
+							height = Math.abs(height);
+						}
+						
+						// Only create redaction if rectangle has meaningful size (at least 5x5 pixels)
+						if (width > 5 && height > 5) {
+							// Convert from screen coordinates to PDF coordinates (unscale)
+							const pdfX = x / VIEWPORT_SCALE;
+							const pdfY = y / VIEWPORT_SCALE;
+							const pdfWidth = width / VIEWPORT_SCALE;
+							const pdfHeight = height / VIEWPORT_SCALE;
+							
+							return {  x: pdfX, y: pdfY, width: pdfWidth, height: pdfHeight }
+						}
+						return null;
+					}
+
+					function clearDrawingCanvas() {
+						console.log(drawingCanvas);
+						console.log(drawingCtx);
+						console.log("Clearing drawing canvas");
+						drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+						isDrawing = false;
+					}
+
 
 					function groupTextContentItems(items) {
 						const groupedItems = [];
@@ -282,6 +364,10 @@ Redaction Tool{% endblock %} {% block content %}
 
 					globalThis.handleTextSelection = handleTextSelection;
 					globalThis.renderPage = renderPage;
+					globalThis.startDrawing = startDrawing;
+					globalThis.drawRectanglePreview = drawRectanglePreview;
+					globalThis.stopDrawing = stopDrawing;
+					globalThis.clearDrawingCanvas = clearDrawingCanvas;
 				</script>
 			</div>
 		</div>

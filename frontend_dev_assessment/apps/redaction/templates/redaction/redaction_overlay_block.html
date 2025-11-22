@@ -1,12 +1,12 @@
 <div id="redaction-{{ redaction.id }}"
 	data-show="$coordinates.page === {{ redaction.coordinates.page }}"
-	style="
-		position: absolute;
-		left: calc({{ redaction.coordinates.x }}px * var(--scale-factor));
-		top: calc({{ redaction.coordinates.y }}px * var(--scale-factor));
-		width: calc({{ redaction.coordinates.width }}px * var(--scale-factor) + 1px);
-		height: calc({{ redaction.coordinates.height }}px * var(--scale-factor));
-		background-color: black;
-		z-index: 10;
-	">
-</div>
+    class="pointer-events-auto 
+            select-none 
+            absolute 
+            left-[calc({{ redaction.coordinates.x }}px*var(--scale-factor))] 
+            top-[calc({{ redaction.coordinates.y }}px*var(--scale-factor))] 
+            w-[calc({{ redaction.coordinates.width }}px*var(--scale-factor)+1px)] 
+            h-[calc({{ redaction.coordinates.height }}px*var(--scale-factor))] 
+            bg-black 
+            z-10"
+></div>
