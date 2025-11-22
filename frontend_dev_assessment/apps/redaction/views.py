@@ -4,9 +4,7 @@ from datastar_py.django import DatastarResponse
 from datastar_py.sse import ServerSentEventGenerator as SSE
 import json
 from datastar_py.consts import ElementPatchMode
-from django.forms.models import model_to_dict
 from django.http import FileResponse
-from django.http import HttpResponseBadRequest
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
@@ -36,20 +34,6 @@ def document_detail(request, pk):
     """
     document = get_object_or_404(Document, pk=pk)
     redactions = document.redactions.all()
-
-
-    if len(redactions) == 0:
-        redactions_json = "[]"
-    else:
-        redactions_json = json.dumps([
-            {
-                "id": r.id,
-                "type": r.redaction_type,
-                "coordinates": r.coordinates,
-            # add more fields as needed
-        }
-        for r in redactions
-    ])
 
     return render(
         request,
