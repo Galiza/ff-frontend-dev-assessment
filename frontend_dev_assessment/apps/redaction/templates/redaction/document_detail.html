@@ -18,7 +18,7 @@ Redaction Tool{% endblock %} {% block content %}
 			id="pdf-viewer-container"
 			class="border border-gray-300 rounded-lg overflow-auto bg-gray-50"
 			style="min-height: 600px"
-			data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1}}"
+			data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1, selections: []}}"
 		>
 			{% comment %} data-on:paginationchanged="evt.detail.source === 'document-detail-pagination' ? $coordinates.page = evt.detail.page  : ''" {% endcomment %}
 			{% comment %} data-effect="renderPage($coordinates.page)" {% endcomment %}
@@ -54,25 +54,34 @@ Redaction Tool{% endblock %} {% block content %}
 					<canvas id="pdf" class="mx-auto border border-gray-300"></canvas>
 					<div id="annotation-layer">
 						{% for redaction in redactions %}
-							{% include "redaction/redaction_overlay_block.html" %}
+							{% if redaction.coordinates.boxes %}
+								{% for box in redaction.coordinates.boxes %}
+									<div id="redaction-{{ redaction.id }}-box-{{ forloop.counter0 }}"
+										data-redaction-id="{{ redaction.id }}"
+										data-show="$coordinates.page === {{ redaction.coordinates.page }}"
+										class="select-none absolute bg-black z-20 
+												left-[calc({{ box.x }}px*var(--scale-factor))]
+												top-[calc({{ box.y }}px*var(--scale-factor))]
+												w-[calc({{ box.width }}px*var(--scale-factor))]
+												h-[calc({{ box.height }}px*var(--scale-factor))]"
+									></div>
+								{% endfor %}
+							{% else %}
+								{% include "redaction/redaction_overlay_block.html" %}
+							{% endif %}
 						{% endfor %}
 					</div>
 					<div id="text-layer"
 						class="textLayer"
 						data-show="$type === 'text'"
 						data-on:mouseup="
-							if (evt.target.matches('span') && handleTextSelection(evt)?.length) {
-								for (const sel of handleTextSelection(evt)) {
-									setTimeout(() => {
-										if (!sel) return;
-										$coordinates.x = sel.x;
-										$coordinates.y = sel.y;
-										$coordinates.width = sel.width;
-										$coordinates.height = sel.height;
-										@post('/document/{{ document.pk }}/redactions/create/');
-									}, 100);
-								}
+						if (evt.target.matches('span')) {
+							const selections = handleTextSelection();
+							if (selections?.length) {
+								$coordinates.selections = selections;
+								@post('/document/{{ document.pk }}/redactions/create/');
 							}
+						}
 						"
 					></div>
 					<canvas class="absolute top-[0px] left-[0px] z-5" 
@@ -138,6 +147,7 @@ Redaction Tool{% endblock %} {% block content %}
 						const loadingTask = pdfjsLib.getDocument(pdfUrl);
 						loadingTask.promise.then((loadedPdf) => {
 							pdf = loadedPdf;
+
 							document.getElementById("totalPages").dispatchEvent(
 								new CustomEvent("totalpagesevent", {
 									detail: {
@@ -145,6 +155,7 @@ Redaction Tool{% endblock %} {% block content %}
 									},
 								})
 							);
+
 							// Load initial page
 							renderPage(1);
 						}).catch(function(error) {
@@ -201,28 +212,55 @@ Redaction Tool{% endblock %} {% block content %}
 							if (rects.length > 0) {
 								const textLayerRect = textLayer.getBoundingClientRect();
 								
-								// Convert each rectangle individually
-								const redactionBoxes = Array.from(rects)
+								// Convert and deduplicate rectangles
+								const boxes = Array.from(rects)
 									.filter(rect => rect.width > 0 && rect.height > 0)
-									.map(rect => {
-										// Screen coordinates relative to text layer
-										const relativeX = rect.left - textLayerRect.left;
-										const relativeY = rect.top - textLayerRect.top;
-										
-										// Unscaled box (for backend)
-										const unscaledBox = {
-											x: relativeX / VIEWPORT_SCALE,
-											y: relativeY / VIEWPORT_SCALE,
-											width: rect.width / VIEWPORT_SCALE,
-											height: rect.height / VIEWPORT_SCALE
-										};
-										
-										return {
-											unscaled: unscaledBox
-										};
-									});
+									.map(rect => ({
+										x: rect.left - textLayerRect.left,
+										y: rect.top - textLayerRect.top,
+										width: rect.width,
+										height: rect.height,
+										// Store original for comparison
+										top: rect.top,
+										bottom: rect.bottom
+									}));
 								
-								return redactionBoxes.map(box => box.unscaled);
+								// Deduplicate and merge overlapping boxes on the same line
+								const mergedBoxes = [];
+								const VERTICAL_THRESHOLD = 2; // pixels tolerance for same line
+								
+								boxes.forEach(box => {
+									// Check if this box overlaps with an existing box (same line)
+									const existingBox = mergedBoxes.find(existing => 
+										Math.abs(existing.top - box.top) < VERTICAL_THRESHOLD &&
+										Math.abs(existing.height - box.height) < VERTICAL_THRESHOLD
+									);
+									
+									if (existingBox) {
+										// Merge with existing box - extend to cover both
+										const minX = Math.min(existingBox.x, box.x);
+										const maxX = Math.max(
+											existingBox.x + existingBox.width,
+											box.x + box.width
+										);
+										existingBox.x = minX;
+										existingBox.width = maxX - minX;
+									} else {
+										// Add as new box
+										mergedBoxes.push(box);
+									}
+								});
+								
+								// Convert to unscaled coordinates
+								const redactionBoxes = mergedBoxes.map(box => ({
+									x: box.x / VIEWPORT_SCALE,
+									y: box.y / VIEWPORT_SCALE,
+									width: box.width / VIEWPORT_SCALE,
+									height: box.height / VIEWPORT_SCALE
+								}));
+								
+								console.log('Deduplicated boxes:', redactionBoxes);
+								return redactionBoxes;
 							}
 							return [];
 						}
@@ -302,18 +340,13 @@ Redaction Tool{% endblock %} {% block content %}
 					}
 
 					function clearDrawingCanvas() {
-						console.log(drawingCanvas);
-						console.log(drawingCtx);
-						console.log("Clearing drawing canvas");
 						drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 						isDrawing = false;
 					}
 
-
 					function groupTextContentItems(items) {
 						const groupedItems = [];
 						let buffer = [];
-						let lastY = null;
 						for (const item of items) {
 							buffer.push(item);
 							if (item.hasEOL) {
@@ -338,6 +371,7 @@ Redaction Tool{% endblock %} {% block content %}
 								buffer = [];
 							}
 						}
+
 						// If any items left in buffer (no EOL at end), join them too
 						if (buffer.length) {
 							const joinedStr = buffer.map(i => i.str).join('');
