@@ -1,0 +1,15 @@
+<!-- Text Layer: Enables text selection in 'text' mode -->
+<!-- Hidden when in 'area' mode -->
+<div id="text-layer"
+     class="textLayer"
+     data-show="$type === 'text'"
+     data-on:mouseup="
+		if (evt.target.matches('span')) {
+			const selections = handleTextSelection();
+			if (selections?.length) {
+				$coordinates.selections = selections;
+				@post('/document/{{ document.pk }}/redactions/create/');
+			}
+		}
+	">
+</div>

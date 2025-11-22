@@ -1,0 +1,18 @@
+<!-- Mode Toggle: Switch between text selection and area drawing -->
+<div id="modeSelector"
+     class="inline-flex rounded-2xl shadow-sm bg-white border border-gray-300 overflow-hidden">
+	
+	<!-- Text Selection Mode Button -->
+	<button class="px-5 py-2 flex items-center gap-2 text-sm font-medium transition-all focus:outline-none"
+	        data-on:click="$type = 'text'"
+	        data-class="{'bg-blue-600 text-white shadow-inner': $type === 'text'}">
+		✍️ <span>Text Selection</span>
+	</button>
+	
+	<!-- Area Drawing Mode Button -->
+	<button class="px-5 py-2 flex items-center gap-2 text-sm font-medium transition-all focus:outline-none"
+	        data-on:click="$type = 'area'"
+	        data-class="{'bg-blue-600 text-white shadow-inner': $type === 'area'}">
+		🟩 <span>Area Drawing</span>
+	</button>
+</div>

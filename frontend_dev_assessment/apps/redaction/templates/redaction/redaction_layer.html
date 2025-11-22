@@ -1,0 +1,22 @@
+<!-- Annotation Layer: Displays all existing redactions as black boxes -->
+<div id="annotation-layer" class="select-none">
+	{% for redaction in redactions %}
+		{% if redaction.coordinates.boxes %}
+			<!-- Multi-box redaction (multiple lines selected) -->
+			{% for box in redaction.coordinates.boxes %}
+				<div id="redaction-{{ redaction.id }}-box-{{ forloop.counter0 }}"
+				     data-redaction-id="{{ redaction.id }}"
+				     data-show="$coordinates.page === {{ redaction.coordinates.page }}"
+				     class="select-none absolute bg-black z-20 
+				            left-[calc({{ box.x }}px*var(--scale-factor))]
+				            top-[calc({{ box.y }}px*var(--scale-factor))]
+				            w-[calc({{ box.width }}px*var(--scale-factor))]
+				            h-[calc({{ box.height }}px*var(--scale-factor))]">
+				</div>
+			{% endfor %}
+		{% else %}
+			<!-- Single-box redaction -->
+			{% include "redaction/redaction_block.html" %}
+		{% endif %}
+	{% endfor %}
+</div>

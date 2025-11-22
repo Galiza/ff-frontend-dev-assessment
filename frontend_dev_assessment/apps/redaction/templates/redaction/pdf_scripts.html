@@ -1,0 +1,426 @@
+<script type="module">
+	/* ================================================================
+	 * PDF Redaction Tool - Inline Module
+	 * Note: Must be inline to access Django template variables
+	 * ================================================================ */
+	
+	/**
+	 * Configuration from Django backend
+	 */
+	const CONFIG = {
+		pdfUrl: "{{ document.file.url }}",
+		documentId: {{ document.pk }},
+		VIEWPORT_SCALE: 1.5,
+		DPR: window.devicePixelRatio || 1
+	};
+	
+	/**
+	 * PDF.js State
+	 */
+	const pdfState = {
+		pdf: null,
+		viewport: null,
+		currentPage: 1
+	};
+	
+	/**
+	 * Drawing State (for area mode)
+	 */
+	const drawingState = {
+		isDrawing: false,
+		startX: 0,
+		startY: 0
+	};
+	
+	/**
+	 * DOM Element References
+	 */
+	const elements = {
+		canvas: document.getElementById("pdf"),
+		textLayer: document.getElementById("text-layer"),
+		loader: document.getElementById("pdf-loader"),
+		pdfContainer: document.getElementById("pdf-container"),
+		drawingCanvas: document.getElementById("drawing-canvas"),
+		totalPagesEl: document.getElementById("totalPages")
+	};
+	
+	/**
+	 * Canvas Contexts
+	 */
+	const contexts = {
+		pdf: elements.canvas.getContext("2d"),
+		drawing: elements.drawingCanvas.getContext("2d")
+	};
+	
+	
+	/* ================================================================
+	 * PDF Initialization
+	 * ================================================================ */
+	
+	/**
+	 * Initialize PDF.js and load document
+	 */
+	async function initPDF() {
+		if (typeof pdfjsLib === "undefined") {
+			elements.loader.innerHTML = "<span class='text-red-600'>PDF.js library not loaded.</span>";
+			return;
+		}
+		
+		elements.loader.style.display = "block";
+		elements.canvas.style.display = "none";
+		elements.pdfContainer.style.setProperty('--scale-factor', CONFIG.VIEWPORT_SCALE);
+		
+		pdfjsLib.GlobalWorkerOptions.workerSrc = 
+			"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.mjs";
+		
+		try {
+			const loadingTask = pdfjsLib.getDocument(CONFIG.pdfUrl);
+			pdfState.pdf = await loadingTask.promise;
+			
+			elements.totalPagesEl.dispatchEvent(
+				new CustomEvent("totalpagesevent", {
+					detail: { totalPages: pdfState.pdf.numPages }
+				})
+			);
+			
+			await renderPage(1);
+		} catch (error) {
+			console.error("Error loading PDF:", error);
+			elements.loader.innerHTML = '<span class="text-red-600">Failed to load PDF</span>';
+		}
+	}
+	
+	
+	/* ================================================================
+	 * PDF Rendering
+	 * ================================================================ */
+	
+	/**
+	 * Render a specific PDF page
+	 * @param {number} pageNum - 1-indexed page number
+	 */
+	async function renderPage(pageNum) {
+		const page = await pdfState.pdf.getPage(pageNum);
+		pdfState.viewport = page.getViewport({ scale: CONFIG.VIEWPORT_SCALE });
+		pdfState.currentPage = pageNum;
+		
+		// Configure canvas with device pixel ratio for sharp rendering
+		configureCanvas(elements.canvas, contexts.pdf, pdfState.viewport);
+		configureCanvas(elements.drawingCanvas, contexts.drawing, pdfState.viewport);
+		
+		// Render PDF page
+		await page.render({
+			canvasContext: contexts.pdf,
+			viewport: pdfState.viewport,
+		}).promise;
+		
+		// Render text layer
+		await renderTextLayer(page);
+		
+		// Update UI
+		elements.loader.style.display = "none";
+		elements.canvas.style.display = "block";
+	}
+	
+	/**
+	 * Configure canvas with proper dimensions and pixel ratio
+	 * @param {HTMLCanvasElement} canvas
+	 * @param {CanvasRenderingContext2D} ctx
+	 * @param {Object} viewport
+	 */
+	function configureCanvas(canvas, ctx, viewport) {
+		canvas.width = viewport.width * CONFIG.DPR;
+		canvas.height = viewport.height * CONFIG.DPR;
+		canvas.style.width = `${viewport.width}px`;
+		canvas.style.height = `${viewport.height}px`;
+		ctx.scale(CONFIG.DPR, CONFIG.DPR);
+	}
+	
+	/**
+	 * Render text layer for text selection
+	 * @param {Object} page - PDF.js page object
+	 */
+	async function renderTextLayer(page) {
+		const textContent = await page.getTextContent();
+		elements.textLayer.innerHTML = "";
+		
+		// Group fragmented text items into complete lines
+		textContent.items = groupTextContentItems(textContent.items);
+		
+		pdfjsLib.renderTextLayer({
+			textContentSource: textContent,
+			viewport: pdfState.viewport,
+			container: elements.textLayer,
+			textDivs: []
+		});
+	}
+	
+	
+	/* ================================================================
+	 * Text Selection Handling
+	 * ================================================================ */
+	
+	/**
+	 * Extract and process text selection into redaction coordinates
+	 * @returns {Array<Object>} Array of coordinate objects
+	 */
+	function handleTextSelection() {
+		const selection = window.getSelection();
+		if (selection.rangeCount === 0 || selection.isCollapsed) return [];
+		
+		const range = selection.getRangeAt(0);
+		const rects = range.getClientRects();
+		if (rects.length === 0) return [];
+		
+		const textLayerRect = elements.textLayer.getBoundingClientRect();
+		
+		// Convert DOMRects to coordinate objects
+		const boxes = Array.from(rects)
+			.filter(rect => rect.width > 0 && rect.height > 0)
+			.map(rect => ({
+				x: rect.left - textLayerRect.left,
+				y: rect.top - textLayerRect.top,
+				width: rect.width,
+				height: rect.height,
+				top: rect.top,
+				bottom: rect.bottom
+			}));
+		
+		// Merge overlapping boxes on same line
+		const mergedBoxes = deduplicateBoxes(boxes);
+		
+		// Convert to PDF coordinates (unscale)
+		return mergedBoxes.map(box => ({
+			x: box.x / CONFIG.VIEWPORT_SCALE,
+			y: box.y / CONFIG.VIEWPORT_SCALE,
+			width: box.width / CONFIG.VIEWPORT_SCALE,
+			height: box.height / CONFIG.VIEWPORT_SCALE
+		}));
+	}
+	
+	/**
+	 * Deduplicate and merge rectangles on same line
+	 * @param {Array<Object>} boxes
+	 * @returns {Array<Object>}
+	 */
+	function deduplicateBoxes(boxes) {
+		const mergedBoxes = [];
+		const VERTICAL_THRESHOLD = 2;
+		
+		boxes.forEach(box => {
+			const existingBox = mergedBoxes.find(existing => 
+				Math.abs(existing.top - box.top) < VERTICAL_THRESHOLD &&
+				Math.abs(existing.height - box.height) < VERTICAL_THRESHOLD
+			);
+			
+			if (existingBox) {
+				const minX = Math.min(existingBox.x, box.x);
+				const maxX = Math.max(
+					existingBox.x + existingBox.width,
+					box.x + box.width
+				);
+				existingBox.x = minX;
+				existingBox.width = maxX - minX;
+			} else {
+				mergedBoxes.push(box);
+			}
+		});
+		
+		return mergedBoxes;
+	}
+	
+	/**
+	 * Group fragmented text items into complete lines
+	 * @param {Array} items - PDF.js text content items
+	 * @returns {Array} Grouped items
+	 */
+	function groupTextContentItems(items) {
+		const groupedItems = [];
+		let buffer = [];
+		
+		for (const item of items) {
+			buffer.push(item);
+			if (item.hasEOL) {
+				groupedItems.push(mergeBufferedItems(item, buffer));
+				buffer = [];
+			}
+		}
+		
+		if (buffer.length > 0) {
+			groupedItems.push(mergeBufferedItems(undefined, buffer));
+		}
+		
+		return groupedItems;
+	}
+	
+	/**
+	 * Merge buffered text items into single item
+	 * @param {Array} buffer
+	 * @returns {Object}
+	 */
+	function mergeBufferedItems(item, buffer) {
+		const joinedStr = buffer.map(i => i.str).join('');
+		const left = item?.str === '' ? 
+						Math.max(...buffer.map(i => i.transform[4])) :
+						Math.min(...buffer.map(i => i.transform[4]));
+		const top = item?.str === '' ? 
+						Math.max(...buffer.map(i => i.transform[5])) :
+						Math.min(...buffer.map(i => i.transform[5]));
+		const right = Math.max(...buffer.map(i => i.transform[4] + i.width));
+		const height = Math.max(...buffer.map(i => i.height));
+		
+		return {
+			...buffer[0],
+			str: joinedStr,
+			hasEOL: buffer[buffer.length - 1].hasEOL || false,
+			width: right - left,
+			height: height,
+			transform: [
+				...buffer[0].transform.slice(0, 4),
+				left,
+				top
+			]
+		};
+	}
+	
+	
+	/* ================================================================
+	 * Rectangle Drawing (Area Mode)
+	 * ================================================================ */
+	
+	/**
+	 * Start drawing rectangle
+	 * @param {MouseEvent} e
+	 */
+	function startDrawing(e) {
+		if (elements.drawingCanvas.style.display === 'none') return;
+		
+		const rect = elements.drawingCanvas.getBoundingClientRect();
+		drawingState.startX = e.clientX - rect.left;
+		drawingState.startY = e.clientY - rect.top;
+		drawingState.isDrawing = true;
+		
+		contexts.drawing.clearRect(
+			0, 0, 
+			elements.drawingCanvas.width, 
+			elements.drawingCanvas.height
+		);
+	}
+	
+	/**
+	 * Draw rectangle preview
+	 * @param {MouseEvent} e
+	 */
+	function drawRectanglePreview(e) {
+		if (!drawingState.isDrawing) return;
+		
+		const rect = elements.drawingCanvas.getBoundingClientRect();
+		const currentX = e.clientX - rect.left;
+		const currentY = e.clientY - rect.top;
+		
+		contexts.drawing.clearRect(
+			0, 0, 
+			elements.drawingCanvas.width, 
+			elements.drawingCanvas.height
+		);
+		
+		const width = currentX - drawingState.startX;
+		const height = currentY - drawingState.startY;
+		
+		contexts.drawing.fillStyle = 'rgba(0, 0, 0, 1)';
+		contexts.drawing.fillRect(drawingState.startX, drawingState.startY, width, height);
+		contexts.drawing.strokeRect(drawingState.startX, drawingState.startY, width, height);
+	}
+	
+	/**
+	 * Finish drawing and return coordinates
+	 * @param {MouseEvent} e
+	 * @returns {Object|null}
+	 */
+	function stopDrawing(e) {
+		if (!drawingState.isDrawing) return null;
+		
+		const rect = elements.drawingCanvas.getBoundingClientRect();
+		const endX = e.clientX - rect.left;
+		const endY = e.clientY - rect.top;
+		
+		let { width, height, x, y } = calculateRectangle(
+			drawingState.startX,
+			drawingState.startY,
+			endX,
+			endY
+		);
+		
+		drawingState.isDrawing = false;
+		
+		// Only return if rectangle is large enough
+		if (width > 5 && height > 5) {
+			return {
+				x: x / CONFIG.VIEWPORT_SCALE,
+				y: y / CONFIG.VIEWPORT_SCALE,
+				width: width / CONFIG.VIEWPORT_SCALE,
+				height: height / CONFIG.VIEWPORT_SCALE
+			};
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * Calculate normalized rectangle dimensions
+	 * @param {number} startX
+	 * @param {number} startY
+	 * @param {number} endX
+	 * @param {number} endY
+	 * @returns {Object}
+	 */
+	function calculateRectangle(startX, startY, endX, endY) {
+		let width = endX - startX;
+		let height = endY - startY;
+		let x = startX;
+		let y = startY;
+		
+		// Normalize if drawn right-to-left or bottom-to-top
+		if (width < 0) {
+			x = endX;
+			width = Math.abs(width);
+		}
+		if (height < 0) {
+			y = endY;
+			height = Math.abs(height);
+		}
+		
+		return { x, y, width, height };
+	}
+	
+	/**
+	 * Clear drawing canvas
+	 */
+	function clearDrawingCanvas() {
+		contexts.drawing.clearRect(
+			0, 0, 
+			elements.drawingCanvas.width, 
+			elements.drawingCanvas.height
+		);
+		drawingState.isDrawing = false;
+	}
+	
+	
+	/* ================================================================
+	 * Global Exports for DataStar
+	 * ================================================================ */
+	
+	globalThis.handleTextSelection = handleTextSelection;
+	globalThis.renderPage = renderPage;
+	globalThis.startDrawing = startDrawing;
+	globalThis.drawRectanglePreview = drawRectanglePreview;
+	globalThis.stopDrawing = stopDrawing;
+	globalThis.clearDrawingCanvas = clearDrawingCanvas;
+	
+	
+	/* ================================================================
+	 * Initialize on Load
+	 * ================================================================ */
+	
+	initPDF();
+</script>

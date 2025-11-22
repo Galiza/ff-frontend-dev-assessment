@@ -1,0 +1,21 @@
+<!-- Drawing Canvas: Enables rectangle drawing in 'area' mode -->
+<!-- Hidden when in 'text' mode -->
+<canvas id="drawing-canvas"
+        class="absolute top-0 left-0 z-5 cursor-crosshair"
+        data-show="$type === 'area'"
+        data-indicator:_creating
+        data-on:mousedown="startDrawing(evt)"
+        data-on:mousemove="drawRectanglePreview(evt)"
+        data-on:mouseup="
+			const sel = stopDrawing(evt);
+			if (sel) {
+				$coordinates.x = sel.x;
+				$coordinates.y = sel.y;
+				$coordinates.width = sel.width;
+				$coordinates.height = sel.height;
+				@post('/document/{{ document.pk }}/redactions/create/');
+			}
+		"
+        data-on-signal-patch="!patch._creating ? clearDrawingCanvas() : ''"
+        data-on-signal-patch-filter="{include: /^_creating/}">
+</canvas>

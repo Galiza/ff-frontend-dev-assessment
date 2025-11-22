@@ -1,478 +1,108 @@
-{% extends "redaction/base.html" %} {% block title %}{{ document.title }} - PDF
-Redaction Tool{% endblock %} {% block content %}
+{% extends "redaction/base.html" %}
+
+{% block title %}{{ document.title }} - PDF Redaction Tool{% endblock %}
+
+{% block content %}
 <div class="flex flex-col lg:flex-row gap-6">
-	<!-- Left Panel: PDF Viewer -->
+	<!-- ================================================================ -->
+	<!-- LEFT PANEL: PDF Viewer with Redaction Tools                      -->
+	<!-- ================================================================ -->
 	<div id="pdf-signals" class="flex-1 bg-white rounded-lg shadow-md p-6">
+		
+		<!-- Document Header -->
 		<div class="mb-4 flex items-center justify-between">
 			<h2 class="text-xl font-bold text-gray-800">{{ document.title }}</h2>
-			<a
-				href="{% url 'redaction:document_list' %}"
-				class="text-blue-600 hover:text-blue-800 text-sm"
-			>
+			<a href="{% url 'redaction:document_list' %}"
+			   class="text-blue-600 hover:text-blue-800 text-sm">
 				&larr; Back to Documents
 			</a>
 		</div>
 
-		<!-- PDF Viewer Container -->
-		<div
-			id="pdf-viewer-container"
-			class="border border-gray-300 rounded-lg overflow-auto bg-gray-50"
-			style="min-height: 600px"
-			data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1, selections: []}}"
-		>
-			{% comment %} data-on:paginationchanged="evt.detail.source === 'document-detail-pagination' ? $coordinates.page = evt.detail.page  : ''" {% endcomment %}
-			{% comment %} data-effect="renderPage($coordinates.page)" {% endcomment %}
-			<!-- Mode Selector -->
-			<div
-				id="modeSelector"
-				class="inline-flex rounded-2xl shadow-sm bg-white border border-gray-300 overflow-hidden"
-			>
-				<!-- Text Selection Mode -->
-				<button
-					class="px-5 py-2 flex items-center gap-2 text-sm font-medium transition-all focus:outline-none"
-					data-on:click="$type = 'text'"
-					data-class="{'bg-blue-600 text-white shadow-inner': $type === 'text'}"
-				>
-					✍️ <span>Text Selection</span>
-				</button>
-				<button
-					class="px-5 py-2 flex items-center gap-2 text-sm font-medium transition-all focus:outline-none"
-					data-on:click="$type = 'area'"
-					data-class="{'bg-blue-600 text-white shadow-inner': $type === 'area'}"
-				>
-					🟩 <span>Area Drawing</span>
-				</button>
-			</div>
+		<!-- PDF Viewer Container with DataStar Signals -->
+		<!-- Signals store: redaction type, coordinates, and selections -->
+		<div id="pdf-viewer-container"
+		     class="border border-gray-300 rounded-lg overflow-auto bg-gray-50"
+		     style="min-height: 600px"
+		     data-signals="{
+				type: 'text', 
+				coordinates: {
+					x: 0, 
+					y: 0, 
+					width: 0, 
+					height: 0, 
+					page: 1, 
+					selections: []
+				}
+			}">
+			
+			<!-- Mode Toggle Buttons -->
+			{% include "redaction/mode_selector.html" %}
+			
+			<!-- PDF Rendering Area -->
 			<div class="p-4"
-				data-on-signal-patch="renderPage(patch.coordinates.page)"
-				data-on-signal-patch-filter="{include: /^coordinates\.page$/, exclude: /^(_fetching|type)$/}"
-				>
-				<!-- PDF Viewer Container -->
+			     data-on-signal-patch="renderPage(patch.coordinates.page)"
+			     data-on-signal-patch-filter="{include: /^coordinates\.page$/, exclude: /^(_fetching|type)$/}">
+				
+				<!-- Loading Indicator -->
 				{% include "redaction/pdf_loader.html" %}
+				
+				<!-- PDF Canvas and Interactive Layers -->
 				<div id="pdf-container" class="pdfViewer relative">
-					{% comment %} {% set action = "@post('/document/{{ document.pk }}/redactions/create/')" %} {% endcomment %}
+					
+					<!-- Base PDF Canvas -->
 					<canvas id="pdf" class="mx-auto border border-gray-300"></canvas>
-					<div id="annotation-layer">
-						{% for redaction in redactions %}
-							{% if redaction.coordinates.boxes %}
-								{% for box in redaction.coordinates.boxes %}
-									<div id="redaction-{{ redaction.id }}-box-{{ forloop.counter0 }}"
-										data-redaction-id="{{ redaction.id }}"
-										data-show="$coordinates.page === {{ redaction.coordinates.page }}"
-										class="select-none absolute bg-black z-20 
-												left-[calc({{ box.x }}px*var(--scale-factor))]
-												top-[calc({{ box.y }}px*var(--scale-factor))]
-												w-[calc({{ box.width }}px*var(--scale-factor))]
-												h-[calc({{ box.height }}px*var(--scale-factor))]"
-									></div>
-								{% endfor %}
-							{% else %}
-								{% include "redaction/redaction_overlay_block.html" %}
-							{% endif %}
-						{% endfor %}
-					</div>
-					<div id="text-layer"
-						class="textLayer"
-						data-show="$type === 'text'"
-						data-on:mouseup="
-						if (evt.target.matches('span')) {
-							const selections = handleTextSelection();
-							if (selections?.length) {
-								$coordinates.selections = selections;
-								@post('/document/{{ document.pk }}/redactions/create/');
-							}
-						}
-						"
-					></div>
-					<canvas class="absolute top-[0px] left-[0px] z-5" 
-						data-show="$type === 'area'" id="drawing-canvas"
-						data-indicator:_creating
-						data-on:mousedown="startDrawing(evt)"
-						data-on:mousemove="drawRectanglePreview(evt)"
-						data-on:mouseup="
-							const sel = stopDrawing(evt);
-							$coordinates.x = sel.x;
-							$coordinates.y = sel.y;
-							$coordinates.width = sel.width;
-							$coordinates.height = sel.height;
-							@post('/document/{{ document.pk }}/redactions/create/');"
-						data-on-signal-patch="!patch._creating ? clearDrawingCanvas() : ''"
-						data-on-signal-patch-filter="{include: /^_creating/}"
-					></canvas>
+					
+					<!-- Redaction Overlays Layer -->
+					<!-- Shows all existing redactions as black boxes -->
+					{% include "redaction/redaction_layer.html" %}
+					
+					<!-- Text Selection Layer -->
+					<!-- Visible only in 'text' mode for selecting text to redact -->
+					{% include "redaction/text_layer.html" with document=document %}
+					
+					<!-- Drawing Canvas Layer -->
+					<!-- Visible only in 'area' mode for drawing rectangles to redact -->
+					{% include "redaction/drawing_canvas.html" with document=document %}
+					
 				</div>
 
+				<!-- Page Navigation Controls -->
 				{% include "redaction/pagination.html" %}
-				<script type="module">
-					// PDFJs variables
-					let pdf = null;
-					let viewport = null;
-					
-					// Get PDF URL sent by the backend
-					const pdfUrl = "{{ document.file.url }}";
-					
-					// Get reference of DOM Elements
-					const canvas = document.getElementById("pdf");
-					const ctx = canvas.getContext("2d");
-					const textLayer = document.getElementById("text-layer");
-					const buttons = document.querySelectorAll(".mode-btn");
-					const loader = document.getElementById("pdf-loader");
-					const pdfContainer = document.getElementById("pdf-container");
-					const drawingCanvas = document.getElementById("drawing-canvas");
-					const drawingCtx = drawingCanvas.getContext("2d");
-					
-					// Setting scale factor for redaction boxes - this can be used in future implementation for zoom functionality
-					const VIEWPORT_SCALE = 1.5;
-					pdfContainer.style.setProperty('--scale-factor', VIEWPORT_SCALE);
-
-					// Drawing state
-					let isDrawing = false;
-					let startX = 0;
-					let startY = 0;
-					let currentRect = null;
-
-					// Setup of PDF.js worker
-					initPDF();
-
-					// Initialize PDF
-					function initPDF() {
-						if (typeof pdfjsLib === "undefined") {
-							loader.innerHTML = "<span class='text-red-600'>PDF.js library not loaded.</span>";
-							return;
-						}
-						loader.style.display = "block";
-						canvas.style.display = "none";
-
-						pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.mjs";
-
-						const loadingTask = pdfjsLib.getDocument(pdfUrl);
-						loadingTask.promise.then((loadedPdf) => {
-							pdf = loadedPdf;
-
-							document.getElementById("totalPages").dispatchEvent(
-								new CustomEvent("totalpagesevent", {
-									detail: {
-										totalPages: pdf.numPages,
-									},
-								})
-							);
-
-							// Load initial page
-							renderPage(1);
-						}).catch(function(error) {
-							console.error("Error loading PDF:", error);
-							document.getElementById("pdf-loader").innerHTML = '<span class="text-red-600">Failed to load PDF</span>';
-						});
-					}
-
-					// Initialize update mode
-					function renderPage(pageNum) {
-						pdf.getPage(pageNum).then((page) => {
-							viewport = page.getViewport({ scale: VIEWPORT_SCALE });
-							canvas.height = viewport.height;
-							canvas.width = viewport.width;
-							drawingCanvas.height = viewport.height;
-							drawingCanvas.width = viewport.width;
-							const renderContext = {
-								canvasContext: ctx,
-								viewport: viewport,
-							};
-
-							page.render(renderContext).promise.then(() => {
-								page.getTextContent().then((textContent) => {
-									// Clear existing text layer
-									textLayer.innerHTML = "";
-
-									// Group text content items into lines as textContent can sometimes contain fragmented pieces
-									textContent.items = groupTextContentItems(textContent.items);
-
-									pdfjsLib.renderTextLayer({
-										textContentSource: textContent,
-										viewport,
-										container: textLayer,
-										textDivs: []
-									});
-
-									loader.style.display = "none";
-									canvas.style.display = "block";
-								});
-							});
-
-						});
-					}
-
-					function handleTextSelection() {
-						const selection = globalThis.getSelection();
-
-						if (selection.rangeCount > 0 && !selection.isCollapsed) {
-							const range = selection.getRangeAt(0);
-							
-							// Get the actual selection rectangles
-							const rects = range.getClientRects();
-							
-							if (rects.length > 0) {
-								const textLayerRect = textLayer.getBoundingClientRect();
-								
-								// Convert and deduplicate rectangles
-								const boxes = Array.from(rects)
-									.filter(rect => rect.width > 0 && rect.height > 0)
-									.map(rect => ({
-										x: rect.left - textLayerRect.left,
-										y: rect.top - textLayerRect.top,
-										width: rect.width,
-										height: rect.height,
-										// Store original for comparison
-										top: rect.top,
-										bottom: rect.bottom
-									}));
-								
-								// Deduplicate and merge overlapping boxes on the same line
-								const mergedBoxes = [];
-								const VERTICAL_THRESHOLD = 2; // pixels tolerance for same line
-								
-								boxes.forEach(box => {
-									// Check if this box overlaps with an existing box (same line)
-									const existingBox = mergedBoxes.find(existing => 
-										Math.abs(existing.top - box.top) < VERTICAL_THRESHOLD &&
-										Math.abs(existing.height - box.height) < VERTICAL_THRESHOLD
-									);
-									
-									if (existingBox) {
-										// Merge with existing box - extend to cover both
-										const minX = Math.min(existingBox.x, box.x);
-										const maxX = Math.max(
-											existingBox.x + existingBox.width,
-											box.x + box.width
-										);
-										existingBox.x = minX;
-										existingBox.width = maxX - minX;
-									} else {
-										// Add as new box
-										mergedBoxes.push(box);
-									}
-								});
-								
-								// Convert to unscaled coordinates
-								const redactionBoxes = mergedBoxes.map(box => ({
-									x: box.x / VIEWPORT_SCALE,
-									y: box.y / VIEWPORT_SCALE,
-									width: box.width / VIEWPORT_SCALE,
-									height: box.height / VIEWPORT_SCALE
-								}));
-								
-								console.log('Deduplicated boxes:', redactionBoxes);
-								return redactionBoxes;
-							}
-							return [];
-						}
-						return [];
-					}
-
-					// Initialize drawing event for area mode
-					function startDrawing(e) {
-						 if (drawingCanvas.style.display === 'none') {
-							return; // Don't draw if canvas is hidden (not in area mode)
-						}
-						
-						const rect = drawingCanvas.getBoundingClientRect();
-						startX = e.clientX - rect.left;
-						startY = e.clientY - rect.top;
-						isDrawing = true;
-						
-						// Clear any previous temporary rectangle
-						drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-					}
-
-					function drawRectanglePreview(e) {
-						if (!isDrawing) return;
-        
-						const rect = drawingCanvas.getBoundingClientRect();
-						const currentX = e.clientX - rect.left;
-						const currentY = e.clientY - rect.top;
-						
-						// Clear canvas and redraw rectangle
-						drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-						
-						const width = currentX - startX;
-						const height = currentY - startY;
-						
-						// Draw rectangle preview with semi-transparent black fill and border
-						drawingCtx.fillStyle = 'rgba(0, 0, 0, 1)';
-						drawingCtx.strokeStyle = 'rgba(0, 0, 0, 1)';
-						
-						drawingCtx.fillRect(startX, startY, width, height);
-						drawingCtx.strokeRect(startX, startY, width, height);
-					}
-
-					function stopDrawing(e) {
-						if (!isDrawing) return;
-        
-						const rect = drawingCanvas.getBoundingClientRect();
-						const endX = e.clientX - rect.left;
-						const endY = e.clientY - rect.top;
-						
-						// Calculate rectangle dimensions
-						let width = endX - startX;
-						let height = endY - startY;
-						let x = startX;
-						let y = startY;
-						
-						// Normalize coordinates if drawn right-to-left or bottom-to-top
-						if (width < 0) {
-							x = endX;
-							width = Math.abs(width);
-						}
-						if (height < 0) {
-							y = endY;
-							height = Math.abs(height);
-						}
-						
-						// Only create redaction if rectangle has meaningful size (at least 5x5 pixels)
-						if (width > 5 && height > 5) {
-							// Convert from screen coordinates to PDF coordinates (unscale)
-							const pdfX = x / VIEWPORT_SCALE;
-							const pdfY = y / VIEWPORT_SCALE;
-							const pdfWidth = width / VIEWPORT_SCALE;
-							const pdfHeight = height / VIEWPORT_SCALE;
-							
-							return {  x: pdfX, y: pdfY, width: pdfWidth, height: pdfHeight }
-						}
-						return null;
-					}
-
-					function clearDrawingCanvas() {
-						drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-						isDrawing = false;
-					}
-
-					function groupTextContentItems(items) {
-						const groupedItems = [];
-						let buffer = [];
-						for (const item of items) {
-							buffer.push(item);
-							if (item.hasEOL) {
-								// Join all buffered items into one line
-								const joinedStr = buffer.map(i => i.str).join('');
-								const left = item.str === '' ? Math.max(...buffer.map(i => i.transform[4])) : Math.min(...buffer.map(i => i.transform[4]));
-								const top = item.str === '' ? Math.max(...buffer.map(i => i.transform[5])) : Math.min(...buffer.map(i => i.transform[5]));
-								const right = Math.max(...buffer.map(i => i.transform[4] + i.width));
-								const height = Math.max(...buffer.map(i => i.height));
-								const width = right - left;
-								const newItem = {
-									...buffer[0],
-									str: joinedStr,
-									hasEOL: true,
-									width: width,
-									height: height,
-									transform: [...buffer[0].transform],
-								};
-								newItem.transform[4] = left;
-								newItem.transform[5] = top;
-								groupedItems.push(newItem);
-								buffer = [];
-							}
-						}
-
-						// If any items left in buffer (no EOL at end), join them too
-						if (buffer.length) {
-							const joinedStr = buffer.map(i => i.str).join('');
-							const left = Math.min(...buffer.map(i => i.transform[4]));
-							const top = Math.min(...buffer.map(i => i.transform[5]));
-							const right = Math.max(...buffer.map(i => i.transform[4] + i.width));
-							const height = Math.max(...buffer.map(i => i.height));
-							const width = right - left;
-							const newItem = {
-								...buffer[0],
-								str: joinedStr,
-								hasEOL: false,
-								width: width,
-								height: height,
-								transform: [...buffer[0].transform],
-							};
-							newItem.transform[4] = left;
-							newItem.transform[5] = top;
-							groupedItems.push(newItem);
-						}
-						return groupedItems;
-					}
-
-					globalThis.handleTextSelection = handleTextSelection;
-					globalThis.renderPage = renderPage;
-					globalThis.startDrawing = startDrawing;
-					globalThis.drawRectanglePreview = drawRectanglePreview;
-					globalThis.stopDrawing = stopDrawing;
-					globalThis.clearDrawingCanvas = clearDrawingCanvas;
-				</script>
+				
+				<!-- PDF.js Initialization and Event Handlers -->
+				{% include "redaction/pdf_scripts.html" %}
 			</div>
 		</div>
 
-		<!-- Action Buttons -->
+		<!-- Download Button -->
 		<div class="mt-4">
-			<a
-				href="{% url 'redaction:document_download' document.pk %}"
-				class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded transition-colors"
-			>
+			<a href="{% url 'redaction:document_download' document.pk %}"
+			   class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded transition-colors">
 				📥 Download Redacted PDF
 			</a>
 		</div>
 	</div>
 
-	<!-- Right Panel: Redactions List -->
+	<!-- ================================================================ -->
+	<!-- RIGHT PANEL: Redactions List Sidebar                             -->
+	<!-- ================================================================ -->
 	<div class="w-full lg:w-80 bg-white rounded-lg shadow-md p-6">
 		<h3 class="text-lg font-bold text-gray-800 mb-4">Redactions</h3>
 
+		<!-- Redaction Count Display -->
 		<div class="text-sm text-gray-600 mb-4">
 			<p>
 				Total:
-				<span id="redaction-count" class="font-semibold"
-					>{{ redactions.count }}</span
-				>
+				<span id="redaction-count" class="font-semibold">{{ redactions.count }}</span>
 			</p>
 		</div>
+		
+		<!-- List of Redactions -->
 		{% include "redaction/redaction_list.html" %}
 	</div>
 </div>
 
-<!-- Help Section -->
-<div class="mt-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
-	<h4 class="font-semibold text-purple-900 mb-2">
-		🎯 Implementation Guidelines
-	</h4>
-	<div class="text-sm text-purple-800 space-y-2">
-		<p><strong>DataStar Resources:</strong></p>
-		<ul class="list-disc list-inside ml-4">
-			<li>
-				<a href="https://data-star.dev" target="_blank" class="underline"
-					>DataStar Documentation</a
-				>
-			</li>
-			<li>
-				<a
-					href="https://data-star.dev/examples"
-					target="_blank"
-					class="underline"
-					>DataStar Examples</a
-				>
-			</li>
-		</ul>
-		<p class="mt-2"><strong>PDF.js Resources:</strong></p>
-		<ul class="list-disc list-inside ml-4">
-			<li>
-				<a
-					href="https://mozilla.github.io/pdf.js/"
-					target="_blank"
-					class="underline"
-					>PDF.js Documentation</a
-				>
-			</li>
-			<li>
-				<a
-					href="https://mozilla.github.io/pdf.js/examples/"
-					target="_blank"
-					class="underline"
-					>PDF.js Examples</a
-				>
-			</li>
-		</ul>
-	</div>
-</div>
+<!-- Help Section with Documentation Links -->
+{% include "redaction/help_section.html" %}
+
 {% endblock %}
