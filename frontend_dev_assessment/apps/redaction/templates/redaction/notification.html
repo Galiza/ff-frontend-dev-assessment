@@ -1,7 +1,7 @@
 <!-- Notification Template  -->
 <div id="notification" 
-    class="notification-enter bg-white rounded-lg shadow-2xl border-l-4 p-4 flex items-start space-x-3 min-w-[320px] drop-shadow-2xl
-          {% if notification_type == 'success' %}border-green-500{% elif notification_type == 'error' %}border-red-500{% else %}border-blue-500{% endif %}">
+    class="notification-enter bg-white rounded-lg shadow-lg border-l-4 border-2 p-4 flex items-start space-x-3 min-w-[320px]
+          {% if notification_type == 'success' %}border-l-green-500 border-green-200{% elif notification_type == 'error' %}border-l-red-500 border-red-200{% else %}border-l-blue-500 border-blue-200{% endif %}">
     <!-- Icon -->
     <div class="flex-shrink-0">
         {% if notification_type == 'success' %}

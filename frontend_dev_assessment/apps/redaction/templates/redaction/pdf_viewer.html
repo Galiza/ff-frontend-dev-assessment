@@ -12,7 +12,7 @@
             </div>
             
             <!-- Center: Pagination -->
-            <div class="flex-1 flex justify-center min-w-[200px]">
+            <div class="flex-1 flex justify-center">
                 {% include "redaction/pagination.html" %}
             </div>
             
@@ -30,16 +30,16 @@
         </div>
     </div>
     
-    <!-- PDF Container with Scroll -->
+    <!-- PDF Container with Scroll (Both X and Y) -->
     <div class="bg-gray-100 overflow-auto" style="max-height: calc(100vh - 12rem);"
         data-on-signal-patch="renderPage(patch.coordinates.page)"
         data-on-signal-patch-filter="{include: /^coordinates\.page$/, exclude: /^(_fetching|type|_hoveredRedaction)$/}">
-        <div class="p-2 sm:p-4">
+        <div class="p-2 sm:p-4 flex items-center justify-center min-h-full">
             <!-- Loading Indicator -->
             {% include "redaction/pdf_loader.html" %}
             
-            <!-- PDF Canvas Container -->
-            <div id="pdf-container" class="pdfViewer relative bg-white shadow-2xl rounded-lg overflow-hidden mx-auto" style="max-width: fit-content;">
+            <!-- PDF Canvas Container - Centered and allows overflow -->
+            <div id="pdf-container" class="pdfViewer relative bg-white shadow-2xl rounded-lg overflow-visible" style="width: fit-content;">
                 <!-- Base PDF Canvas -->
                 <canvas id="pdf"></canvas>
                 
