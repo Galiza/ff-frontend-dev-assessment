@@ -4,15 +4,15 @@
      data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1, selections: []}, _hoveredRedaction: null}">
     
     <!-- Fixed Toolbar (Sticky within this container) -->
-    <div class="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
-        <div class="px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+      <div class="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+        <div class="px-4 py-3 flex items-center justify-center gap-4 flex-wrap">
             <!-- Left: Mode Selector -->
             <div class="flex-shrink-0">
                 {% include "redaction/mode_selector.html" %}
             </div>
             
             <!-- Center: Pagination -->
-            <div class="flex-1 flex justify-center">
+            <div class="flex-1 flex justify-center min-w-[200px]">
                 {% include "redaction/pagination.html" %}
             </div>
             
@@ -30,20 +30,20 @@
         </div>
     </div>
     
-    <!-- PDF Container with Scroll (Both X and Y) -->
+    <!-- PDF Container -->
     <div class="bg-gray-100 overflow-auto" style="max-height: calc(100vh - 12rem);"
         data-on-signal-patch="renderPage(patch.coordinates.page)"
         data-on-signal-patch-filter="{include: /^coordinates\.page$/, exclude: /^(_fetching|type|_hoveredRedaction)$/}">
-        <div class="p-2 sm:p-4 flex items-center justify-center min-h-full">
+        <div class="p-2 sm:p-4 flex items-center min-h-full">
             <!-- Loading Indicator -->
             {% include "redaction/pdf_loader.html" %}
             
-            <!-- PDF Canvas Container - Centered and allows overflow -->
+            <!-- PDF Canvas Container  -->
             <div id="pdf-container" class="pdfViewer relative bg-white shadow-2xl rounded-lg overflow-visible" style="width: fit-content;">
                 <!-- Base PDF Canvas -->
                 <canvas id="pdf"></canvas>
                 
-                <!-- Redaction Overlays Layer with Hover Effects -->
+                <!-- Redaction Overlays Layer -->
                 <div id="annotation-layer" class="select-none">
                     {% for redaction in redactions %}
                         {% if redaction.coordinates.boxes %}
