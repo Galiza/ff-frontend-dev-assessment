@@ -1,0 +1,86 @@
+<!-- PDF Viewer (Left Panel) -->
+<div id="pdf-signals" 
+     class="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+     data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1, selections: []}, notification: {show: false, message: '', type: 'success'}}">
+    
+    <div class="h-full flex flex-col">
+        <!-- PDF Container -->
+        <div class="flex-1 bg-gray-100 overflow-auto">
+            <div class="max-w-4xl mx-auto p-8">
+                <!-- Loading Indicator -->
+                {% include "redaction/pdf_loader.html" %}
+                
+                <!-- PDF Canvas Container -->
+                <div id="pdf-container" class="pdfViewer relative bg-white shadow-2xl rounded-lg overflow-hidden">
+                    <!-- Base PDF Canvas -->
+                    <canvas id="pdf" class="mx-auto"></canvas>
+                    
+                    <!-- Redaction Overlays Layer - Shows all existing redactions as black boxes -->
+                    <div id="annotation-layer" class="select-none">
+                        {% for redaction in redactions %}
+                            {% if redaction.coordinates.boxes %}
+                                <!-- Multi-box redaction (multiple lines selected) -->
+                                {% for box in redaction.coordinates.boxes %}
+                                    <div id="redaction-{{ redaction.id }}-box-{{ forloop.counter0 }}"
+                                         data-redaction-id="{{ redaction.id }}"
+                                         data-show="$coordinates.page === {{ redaction.coordinates.page }}"
+                                         class="select-none absolute bg-black z-20 
+                                                left-[calc({{ box.x }}px*var(--scale-factor))]
+                                                top-[calc({{ box.y }}px*var(--scale-factor))]
+                                                w-[calc({{ box.width }}px*var(--scale-factor))]
+                                                h-[calc({{ box.height }}px*var(--scale-factor))]">
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <!-- Single-box redaction -->
+                                {% include "redaction/redaction_block.html" %}
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Text Layer: Enables text selection in 'text' mode, hidden when in 'area' mode -->
+                    <div id="text-layer"
+                         class="textLayer"
+                         data-show="$type === 'text'"
+                         data-on:mouseup="
+                            if (evt.target.matches('span')) {
+                                const selections = handleTextSelection();
+                                if (selections?.length) {
+                                    $coordinates.selections = selections;
+                                    @post('/document/{{ document.pk }}/redactions/create/');
+                                }
+                            }
+                         ">
+                    </div>
+                    
+                    <!-- Drawing Canvas: Enables rectangle drawing in 'area' mode, hidden when in 'text' mode -->
+                    <canvas id="drawing-canvas"
+                            class="absolute top-0 left-0 z-5 cursor-crosshair"
+                            data-show="$type === 'area'"
+                            data-indicator:_creating
+                            data-on:mousedown="startDrawing(evt)"
+                            data-on:mousemove="drawRectanglePreview(evt)"
+                            data-on:mouseup="
+                                const sel = stopDrawing(evt);
+                                if (sel) {
+                                    $coordinates.x = sel.x;
+                                    $coordinates.y = sel.y;
+                                    $coordinates.width = sel.width;
+                                    $coordinates.height = sel.height;
+                                    @post('/document/{{ document.pk }}/redactions/create/');
+                                }
+                            "
+                            data-on-signal-patch="!patch._creating ? clearDrawingCanvas() : ''"
+                            data-on-signal-patch-filter="{include: /^_creating/}">
+                    </canvas>
+                </div>
+                
+                <!-- Page Navigation Controls -->
+                {% include "redaction/pagination.html" %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- PDF.js Initialization and Event Handlers -->
+    {% include "redaction/pdf_scripts.html" %}
+</div>

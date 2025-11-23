@@ -1,18 +1,24 @@
 <!-- Mode Toggle: Switch between text selection and area drawing -->
-<div id="modeSelector"
-     class="inline-flex rounded-2xl shadow-sm bg-white border border-gray-300 overflow-hidden">
-	
-	<!-- Text Selection Mode Button -->
-	<button class="px-5 py-2 flex items-center gap-2 text-sm font-medium transition-all focus:outline-none"
-	        data-on:click="$type = 'text'"
-	        data-class="{'bg-blue-600 text-white shadow-inner': $type === 'text'}">
-		✍️ <span>Text Selection</span>
-	</button>
-	
-	<!-- Area Drawing Mode Button -->
-	<button class="px-5 py-2 flex items-center gap-2 text-sm font-medium transition-all focus:outline-none"
-	        data-on:click="$type = 'area'"
-	        data-class="{'bg-blue-600 text-white shadow-inner': $type === 'area'}">
-		🟩 <span>Area Drawing</span>
-	</button>
+<div id="modeSelector" class="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+    <!-- Text Selection Mode Button -->
+    <button class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors focus:outline-none"
+            data-on:click="$type = 'text'"
+            data-class="{'text-white bg-blue-600 shadow-sm': $type === 'text', 'text-gray-700 hover:bg-gray-50': $type !== 'text'}">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+        </svg>
+        Text Selection
+    </button>
+    
+    <!-- Area Drawing Mode Button -->
+    <button class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors focus:outline-none"
+            data-on:click="$type = 'area'"
+            data-class="{'text-white bg-blue-600 shadow-sm': $type === 'area', 'text-gray-700 hover:bg-gray-50': $type !== 'area'}">
+        <svg fill="none" width="16px" height="16px" viewBox="0 0 32 32" id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg">
+            <defs></defs>
+            <path d="M27,22.142V9.858A3.9916,3.9916,0,1,0,22.142,5H9.858A3.9916,3.9916,0,1,0,5,9.858V22.142A3.9916,3.9916,0,1,0,9.858,27H22.142A3.9916,3.9916,0,1,0,27,22.142ZM26,4a2,2,0,1,1-2,2A2.0023,2.0023,0,0,1,26,4ZM4,6A2,2,0,1,1,6,8,2.002,2.002,0,0,1,4,6ZM6,28a2,2,0,1,1,2-2A2.0023,2.0023,0,0,1,6,28Zm16.142-3H9.858A3.9937,3.9937,0,0,0,7,22.142V9.858A3.9947,3.9947,0,0,0,9.858,7H22.142A3.9937,3.9937,0,0,0,25,9.858V22.142A3.9931,3.9931,0,0,0,22.142,25ZM26,28a2,2,0,1,1,2-2A2.0027,2.0027,0,0,1,26,28Z" transform="translate(0 0)"/>
+            <rect id="Transparent_Rectangle" data-name="&lt;Transparent Rectangle&gt;" fill="none" width="32" height="32"/>
+        </svg>
+        Area Drawing
+    </button>
 </div>

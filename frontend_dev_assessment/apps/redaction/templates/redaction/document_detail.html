@@ -3,106 +3,43 @@
 {% block title %}{{ document.title }} - PDF Redaction Tool{% endblock %}
 
 {% block content %}
-<div class="flex flex-col lg:flex-row gap-6">
-	<!-- ================================================================ -->
-	<!-- LEFT PANEL: PDF Viewer with Redaction Tools                      -->
-	<!-- ================================================================ -->
-	<div id="pdf-signals" class="flex-1 bg-white rounded-lg shadow-md p-6">
-		
-		<!-- Document Header -->
-		<div class="mb-4 flex items-center justify-between">
-			<h2 class="text-xl font-bold text-gray-800">{{ document.title }}</h2>
-			<a href="{% url 'redaction:document_list' %}"
-			   class="text-blue-600 hover:text-blue-800 text-sm">
-				&larr; Back to Documents
-			</a>
-		</div>
+<div class="py-4">
+    <!-- Document Header -->
+    <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center space-x-4">
+            <a href="{% url 'redaction:document_list' %}" 
+               class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </a>
+            <div>
+                <h1 class="text-xl font-semibold text-gray-900">{{ document.title }}</h1>
+                <p class="text-xs text-gray-500 mt-0.5">
+                    <span id="totalPages-display">Loading...</span> • 
+                    <span id="redaction-count-display">{{ redactions.count }}</span> redaction{{ redactions.count|pluralize }}
+                </p>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="flex items-center space-x-3">
+            {% include "redaction/mode_selector.html" %}
+            
+            <a href="{% url 'redaction:document_download' document.pk %}"
+               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Download PDF
+            </a>
+        </div>
+    </div>
 
-		<!-- PDF Viewer Container with DataStar Signals -->
-		<!-- Signals store: redaction type, coordinates, and selections -->
-		<div id="pdf-viewer-container"
-		     class="border border-gray-300 rounded-lg overflow-auto bg-gray-50"
-		     style="min-height: 600px"
-		     data-signals="{
-				type: 'text', 
-				coordinates: {
-					x: 0, 
-					y: 0, 
-					width: 0, 
-					height: 0, 
-					page: 1, 
-					selections: []
-				}
-			}">
-			
-			<!-- Mode Toggle Buttons -->
-			{% include "redaction/mode_selector.html" %}
-			
-			<!-- PDF Rendering Area -->
-			<div class="p-4"
-			     data-on-signal-patch="renderPage(patch.coordinates.page)"
-			     data-on-signal-patch-filter="{include: /^coordinates\.page$/, exclude: /^(_fetching|type)$/}">
-				
-				<!-- Loading Indicator -->
-				{% include "redaction/pdf_loader.html" %}
-				
-				<!-- PDF Canvas and Interactive Layers -->
-				<div id="pdf-container" class="pdfViewer relative">
-					
-					<!-- Base PDF Canvas -->
-					<canvas id="pdf" class="mx-auto border border-gray-300"></canvas>
-					
-					<!-- Redaction Overlays Layer -->
-					<!-- Shows all existing redactions as black boxes -->
-					{% include "redaction/redaction_layer.html" %}
-					
-					<!-- Text Selection Layer -->
-					<!-- Visible only in 'text' mode for selecting text to redact -->
-					{% include "redaction/text_layer.html" with document=document %}
-					
-					<!-- Drawing Canvas Layer -->
-					<!-- Visible only in 'area' mode for drawing rectangles to redact -->
-					{% include "redaction/drawing_canvas.html" with document=document %}
-					
-				</div>
-
-				<!-- Page Navigation Controls -->
-				{% include "redaction/pagination.html" %}
-				
-				<!-- PDF.js Initialization and Event Handlers -->
-				{% include "redaction/pdf_scripts.html" %}
-			</div>
-		</div>
-
-		<!-- Download Button -->
-		<div class="mt-4">
-			<a href="{% url 'redaction:document_download' document.pk %}"
-			   class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded transition-colors">
-				📥 Download Redacted PDF
-			</a>
-		</div>
-	</div>
-
-	<!-- ================================================================ -->
-	<!-- RIGHT PANEL: Redactions List Sidebar                             -->
-	<!-- ================================================================ -->
-	<div class="w-full lg:w-80 bg-white rounded-lg shadow-md p-6">
-		<h3 class="text-lg font-bold text-gray-800 mb-4">Redactions</h3>
-
-		<!-- Redaction Count Display -->
-		<div class="text-sm text-gray-600 mb-4">
-			<p>
-				Total:
-				<span id="redaction-count" class="font-semibold">{{ redactions.count }}</span>
-			</p>
-		</div>
-		
-		<!-- List of Redactions -->
-		{% include "redaction/redaction_list.html" %}
-	</div>
+    <!-- Main Layout -->
+    <div class="flex flex-col lg:flex-row gap-6 h-[calc(100vh-12rem)]">
+        {% include "redaction/pdf_viewer.html" %}
+        {% include "redaction/redactions_sidebar.html" %}
+    </div>
 </div>
-
-<!-- Help Section with Documentation Links -->
-{% include "redaction/help_section.html" %}
-
 {% endblock %}

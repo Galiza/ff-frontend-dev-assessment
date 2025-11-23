@@ -1,47 +1,38 @@
-<li
-    id="redaction-item-{{ redaction.id }}"
-    class="border border-gray-200 rounded p-3 hover:border-blue-400 transition-colors"
->
-    <div class="flex items-start justify-between">
-        <div class="flex-1">
-            <div class="flex items-center gap-2 mb-1">
-                <span
-                    class="text-xs font-semibold px-2 py-1 rounded {% if redaction.redaction_type == 'text' %} bg-blue-100 text-blue-800 {% else %} bg-purple-100 text-purple-800 {% endif %}"
-                >
-                    {{ redaction.get_redaction_type_display }}
-                </span>
-            </div>
-            <p class="text-xs text-gray-600">
-                Page {{ redaction.coordinates.page|default:"?" }}
-            </p>
-            {% if redaction.coordinates.boxes %}
-                <p class="text-xs text-gray-500 mt-1">Multi-line selection</p>
-				{% for box in redaction.coordinates.boxes %}
-							 <p class="text-xs text-gray-500 mt-1">
-                    Position: ({{ box.x|floatformat:0 }}, {{box.y|floatformat:0 }})
-                </p>
-                <p class="text-xs text-gray-500">
-                    Size: {{ box.width|floatformat:0 }} × {{box.height|floatformat:0 }}
-                </p>
-				{% endfor %}
-            {% else %}
-                <p class="text-xs text-gray-500 mt-1">
-                    Position: ({{ redaction.coordinates.x|floatformat:0 }}, {{redaction.coordinates.y|floatformat:0 }})
-                </p>
-                <p class="text-xs text-gray-500">
-                    Size: {{ redaction.coordinates.width|floatformat:0 }} × {{redaction.coordinates.height|floatformat:0 }}
-                </p>
-            {% endif %}
-        </div>
-        <button
-            data-indicator:_fetching
-            data-attr:disabled="$_fetching"
-            data-on:click="@delete('/document/{{document.id}}/redaction/{{redaction.id}}/delete/')"
-            data-class="{'opacity-50 cursor-not-allowed': $_fetching}"
-            class="text-red-600 hover:text-red-800 text-xs hover:bg-red-50 px-2 py-1 rounded transition-colors"
-            title="Delete redaction"
-        >
-            🗑️
+<!-- Redaction List Item -->
+<li id="redaction-item-{{ redaction.id }}"
+	class="bg-gray-50 rounded-lg p-4 border border-gray-200 {% if redaction.redaction_type == 'text' %}hover:border-blue-300 hover:bg-blue-50{% else %}hover:border-purple-300 hover:bg-purple-50{% endif %} transition-all group">
+    <div class="flex items-start justify-between mb-2">
+        <!-- Redaction Type Badge -->
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
+                     {% if redaction.redaction_type == 'text' %}bg-blue-100 text-blue-800{% else %}bg-purple-100 text-purple-800{% endif %}">
+            {{ redaction.get_redaction_type_display }}
+        </span>
+        
+        <!-- Delete Button (shows on hover) -->
+        <button data-indicator:_fetching
+                data-attr:disabled="$_fetching"
+                data-on:click="@delete('/document/{{document.id}}/redaction/{{redaction.id}}/delete/')"
+                data-class="{'opacity-50 cursor-not-allowed': $_fetching}"
+                class="text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+                title="Delete redaction">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
         </button>
+    </div>
+    
+    <!-- Redaction Details -->
+    <div class="text-xs text-gray-600 space-y-1">
+        <p>Page {{ redaction.coordinates.page|default:"?" }}</p>
+        
+        {% if redaction.coordinates.boxes %}
+            <!-- Multi-line redaction details -->
+            <p class="text-gray-500">({{ redaction.coordinates.boxes|length }} boxes)</p>
+            <p class="text-gray-500">Multi-line selection</p>
+        {% else %}
+            <!-- Single redaction details -->
+            <p>Position: ({{ redaction.coordinates.x|floatformat:0 }}, {{ redaction.coordinates.y|floatformat:0 }})</p>
+            <p>Size: {{ redaction.coordinates.width|floatformat:0 }} × {{ redaction.coordinates.height|floatformat:0 }}</p>
+        {% endif %}
     </div>
 </li>

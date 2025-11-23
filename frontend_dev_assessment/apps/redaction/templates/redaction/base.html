@@ -26,36 +26,51 @@
 		{% load static %}
 		<link rel="stylesheet" type="text/css" href="{% static 'pdf/fonts/style.css' %}">
 
+		<style>
+			@keyframes slideInRight {
+				from { transform: translateX(100%); opacity: 0; }
+				to { transform: translateX(0); opacity: 1; }
+			}
+			@keyframes slideOutRight {
+				from { transform: translateX(0); opacity: 1; }
+				to { transform: translateX(100%); opacity: 0; }
+			}
+			.notification-enter { animation: slideInRight 0.3s ease-out; }
+			.notification-exit { animation: slideOutRight 0.3s ease-in; }
+		</style>
+
 		{% block extra_head %}{% endblock %}
 	</head>
 	<body class="bg-gray-100 min-h-screen">
 		<!-- Navigation -->
-		<nav class="bg-white shadow-lg mb-6">
-			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-				<div class="flex justify-between h-16">
-					<div class="flex items-center">
-						<h1 class="text-xl font-bold text-gray-800">
-							<a
-								href="{% url 'redaction:document_list' %}"
-								class="hover:text-blue-600"
-							>
+		<header class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+			<div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+				<div class="flex justify-between items-center h-16">
+					<div class="flex items-center space-x-3">
+						<div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+							<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+							</svg>
+						</div>
+						<h1 class="text-xl font-semibold text-gray-900">
+							<a href="{% url 'redaction:document_list' %}" class="hover:text-blue-600 transition-colors">
 								PDF Redaction Tool
 							</a>
 						</h1>
 					</div>
-					<div class="flex items-center">
-						<span class="text-sm text-gray-600"
-							>Frontend Developer Assessment</span
-						>
-					</div>
+					<span class="text-sm text-gray-500 hidden sm:block">Frontend Developer Assessment</span>
 				</div>
 			</div>
-		</nav>
+		</header>
 
 		<!-- Main Content -->
-		<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+		<main class="max-w-full mx-auto px-4 sm:px-6 lg:px-8 pb-12">
 			{% block content %}{% endblock %}
 		</main>
+
+		<!-- Notification Container -->
+		<div id="notification-container" class="fixed top-20 right-4 z-50 space-y-3 max-w-sm">
+		</div>
 
 		{% block extra_scripts %}{% endblock %}
 	</body>

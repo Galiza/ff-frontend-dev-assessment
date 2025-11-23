@@ -1,0 +1,15 @@
+<!-- Redactions Sidebar (Right Panel) -->
+<div class="w-full lg:w-96 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
+    <!-- Sidebar Header -->
+    <div class="p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Redactions</h3>
+        <p class="text-sm text-gray-500 mt-1">
+            Total: <span id="redaction-count" class="font-semibold text-gray-900">{{ redactions.count }}</span>
+        </p>
+    </div>
+    
+    <!-- Redactions List Container -->
+    <div class="flex-1 overflow-auto p-4">
+        {% include "redaction/redaction_list.html" %}
+    </div>
+</div>

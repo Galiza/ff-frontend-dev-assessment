@@ -1,11 +1,12 @@
+<!-- Redactions List Container -->
 <div id="redactions-container">
-    <ul id="redactions-list" class="space-y-2">
+    <ul id="redactions-list" class="space-y-3">
         {% if redactions %}
-			{% for redaction in redactions %}
+            {% for redaction in redactions %}
                 {% include "redaction/redaction_list_item.html" %}
-			{% endfor %}
-            {% else %}
-                {% include "redaction/empty_redaction_list.html" %}
+            {% endfor %}
+        {% else %}
+            {% include "redaction/empty_redaction_list.html" %}
         {% endif %}
     </ul>
 </div>

@@ -1,52 +1,44 @@
-
-
-
-<div
-	class="mt-4 flex items-center justify-center border-t border-gray-200 pt-4 gap-2"
-	data-signals:_pages="{totalPages: 1}"
->
-	<button
-		data-on:click="$coordinates.page > 1 ? $coordinates.page-- : ''"
-		data-attr:disabled="$coordinates.page <= 1"
-		data-class="{'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400': $coordinates.page <= 1, 'bg-gray-100 text-gray-700 hover:bg-gray-200': $coordinates.page > 1}"
-		class="flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors"
-	>
-		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				stroke-width="2"
-				d="M15 19l-7-7 7-7"
-			></path>
-		</svg>
-		<span>Previous</span>
-	</button>
-
-	<span class="text-sm text-gray-600">
-		Page <span data-text="$coordinates.page" class="font-semibold"></span> of
-		<span
-			id="totalPages"
-			data-on:totalpagesevent="$_pages.totalPages = evt.detail.totalPages"
-			data-text="$_pages.totalPages"
-			class="font-semibold"
-		></span>
-	</span>
-
-	<button
-		id="next-page"
-		data-on:click="$coordinates.page < $_pages.totalPages ? $coordinates.page++ : ''"
-		data-attr:disabled="$coordinates.page >= $_pages.totalPages"
-		data-class="{'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400': $coordinates.page >= $_pages.totalPages, 'bg-gray-100 text-gray-700 hover:bg-gray-200': $_pages.currentPage < $_pages.totalPages}"
-		class="flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors"
-	>
-		<span>Next</span>
-		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				stroke-width="2"
-				d="M9 5l7 7-7 7"
-			></path>
-		</svg>
-	</button>
+<!-- Page Navigation Controls -->
+<div class="mt-6 flex items-center justify-center space-x-4"
+     data-signals:_pages="{totalPages: 1}">
+    
+    <!-- Previous Button -->
+    <button data-on:click="$coordinates.page > 1 ? $coordinates.page-- : ''"
+            data-attr:disabled="$coordinates.page <= 1"
+            data-class="{'opacity-50 cursor-not-allowed': $coordinates.page <= 1, 'hover:bg-gray-100': $coordinates.page > 1}"
+            class="p-2 rounded-lg border border-gray-300 bg-white transition-colors disabled:cursor-not-allowed">
+        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+    </button>
+    
+    <!-- Page Info -->
+    <span class="text-sm text-gray-600">
+        Page <span data-text="$coordinates.page" class="font-semibold text-gray-900"></span> of
+        <span id="totalPages"
+              data-on:totalpagesevent="$_pages.totalPages = evt.detail.totalPages"
+              data-text="$_pages.totalPages"
+              class="font-semibold text-gray-900"></span>
+    </span>
+    
+    <!-- Next Button -->
+    <button id="next-page"
+            data-on:click="$coordinates.page < $_pages.totalPages ? $coordinates.page++ : ''"
+            data-attr:disabled="$coordinates.page >= $_pages.totalPages"
+            data-class="{'opacity-50 cursor-not-allowed': $coordinates.page >= $_pages.totalPages, 'hover:bg-gray-100': $coordinates.page < $_pages.totalPages}"
+            class="p-2 rounded-lg border border-gray-300 bg-white transition-colors disabled:cursor-not-allowed">
+        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+    </button>
 </div>
+
+<script>
+    // Update display when total pages changes
+    document.getElementById('totalPages').addEventListener('totalpagesevent', (e) => {
+        const display = document.getElementById('totalPages-display');
+        if (display) {
+            display.textContent = `${e.detail.totalPages} pages`;
+        }
+    });
+</script>
