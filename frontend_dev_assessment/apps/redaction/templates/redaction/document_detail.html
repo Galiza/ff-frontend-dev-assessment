@@ -3,43 +3,39 @@
 {% block title %}{{ document.title }} - PDF Redaction Tool{% endblock %}
 
 {% block content %}
-<div class="py-4">
-    <!-- Document Header -->
-    <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div class="flex items-center space-x-4">
-            <a href="{% url 'redaction:document_list' %}" 
-               class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-            </a>
-            <div>
-                <h1 class="text-xl font-semibold text-gray-900">{{ document.title }}</h1>
-                <p class="text-xs text-gray-500 mt-0.5">
-                    <span id="totalPages-display">Loading...</span> • 
-                    <span id="redaction-count-display">{{ redactions.count }}</span> redaction{{ redactions.count|pluralize }}
-                </p>
+<div class="min-h-[calc(100vh-6rem)]">
+    <div class="pt-4">
+        <!-- Responsive Layout -->
+        <div class="flex flex-wrap gap-6 items-start">
+            <!-- Column 1 - Back Button & Document Info -->
+            <div class="flex-shrink-0">
+				<a href="{% url 'redaction:document_list' %}" 
+					class="flex py-2 px-1 items-start sticky top-6
+						inline-flex items-center 
+						justify-center
+						rounded-lg bg-white border 
+						border-gray-200 text-gray-600 
+						hover:bg-gray-50 hover:border-gray-300 
+						transition-colors shadow-sm"
+						title="Back to documents"
+					>
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+					</svg>
+					<h2 class="text-sm font-semibold text-gray-900">Back to documents</h2>
+				</a>
+            </div>
+            
+            <!-- Column 2 - PDF Viewer  -->
+            <div class="flex-1 min-w-0">
+                {% include "redaction/pdf_viewer.html" %}
+            </div>
+            
+            <!-- Column 3 - Redactions Sidebar -->
+            <div class="w-full lg:w-80 flex-shrink-0">
+                {% include "redaction/redactions_sidebar.html" %}
             </div>
         </div>
-        
-        <!-- Actions -->
-        <div class="flex items-center space-x-3">
-            {% include "redaction/mode_selector.html" %}
-            
-            <a href="{% url 'redaction:document_download' document.pk %}"
-               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                </svg>
-                Download PDF
-            </a>
-        </div>
-    </div>
-
-    <!-- Main Layout -->
-    <div class="flex flex-col lg:flex-row gap-6 h-[calc(100vh-12rem)]">
-        {% include "redaction/pdf_viewer.html" %}
-        {% include "redaction/redactions_sidebar.html" %}
     </div>
 </div>
 {% endblock %}

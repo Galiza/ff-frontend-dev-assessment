@@ -1,33 +1,36 @@
-<!-- Page Navigation Controls -->
-<div class="mt-6 flex items-center justify-center space-x-4"
+<div class="flex items-center justify-center"
      data-signals:_pages="{totalPages: 1}">
     
     <!-- Previous Button -->
     <button data-on:click="$coordinates.page > 1 ? $coordinates.page-- : ''"
             data-attr:disabled="$coordinates.page <= 1"
             data-class="{'opacity-50 cursor-not-allowed': $coordinates.page <= 1, 'hover:bg-gray-100': $coordinates.page > 1}"
-            class="p-2 rounded-lg border border-gray-300 bg-white transition-colors disabled:cursor-not-allowed">
-        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            class="p-2 rounded-lg transition-colors disabled:cursor-not-allowed"
+            title="Previous page">
+        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
     </button>
     
     <!-- Page Info -->
-    <span class="text-sm text-gray-600">
-        Page <span data-text="$coordinates.page" class="font-semibold text-gray-900"></span> of
+    <div class="flex items-center gap-2 min-w-[100px] justify-center">
+        <span class="text-sm text-gray-600">
+            Page <span data-text="$coordinates.page" class="font-semibold text-gray-900"></span>
+        </span>
+        <span class="text-gray-400">/</span>
         <span id="totalPages"
               data-on:totalpagesevent="$_pages.totalPages = evt.detail.totalPages"
               data-text="$_pages.totalPages"
-              class="font-semibold text-gray-900"></span>
-    </span>
+              class="text-sm font-semibold text-gray-900"></span>
+    </div>
     
     <!-- Next Button -->
-    <button id="next-page"
-            data-on:click="$coordinates.page < $_pages.totalPages ? $coordinates.page++ : ''"
+    <button data-on:click="$coordinates.page < $_pages.totalPages ? $coordinates.page++ : ''"
             data-attr:disabled="$coordinates.page >= $_pages.totalPages"
             data-class="{'opacity-50 cursor-not-allowed': $coordinates.page >= $_pages.totalPages, 'hover:bg-gray-100': $coordinates.page < $_pages.totalPages}"
-            class="p-2 rounded-lg border border-gray-300 bg-white transition-colors disabled:cursor-not-allowed">
-        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            class="p-2 rounded-lg transition-colors disabled:cursor-not-allowed"
+            title="Next page">
+        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
         </svg>
     </button>

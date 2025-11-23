@@ -1,12 +1,15 @@
 <div id="redaction-{{ redaction.id }}"
-	data-show="$coordinates.page === {{ redaction.coordinates.page }}"
+    data-show="$coordinates.page === {{ redaction.coordinates.page }}"
+    data-on:mouseenter="$_hoveredRedaction = {{ redaction.id }}"
+    data-on:mouseleave="$_hoveredRedaction = ''"
+    data-class="{'ring-4 {% if redaction.redaction_type == 'text' %}ring-blue-500{% else %}ring-purple-500{% endif %} ring-opacity-70 z-30': $_hoveredRedaction === {{ redaction.id }}, 'z-20': $_hoveredRedaction !== {{ redaction.id }}}"
     class="pointer-events-auto 
-            select-none 
-            absolute 
-            left-[calc({{ redaction.coordinates.x }}px*var(--scale-factor))] 
-            top-[calc({{ redaction.coordinates.y }}px*var(--scale-factor))] 
-            w-[calc({{ redaction.coordinates.width }}px*var(--scale-factor))] 
-            h-[calc({{ redaction.coordinates.height }}px*var(--scale-factor))] 
-            bg-black 
-            z-10"
+        select-none 
+        absolute 
+        left-[calc({{ redaction.coordinates.x }}px*var(--scale-factor))] 
+        top-[calc({{ redaction.coordinates.y }}px*var(--scale-factor))] 
+        w-[calc({{ redaction.coordinates.width }}px*var(--scale-factor))] 
+        h-[calc({{ redaction.coordinates.height }}px*var(--scale-factor))] 
+        bg-black 
+        z-20"
 ></div>

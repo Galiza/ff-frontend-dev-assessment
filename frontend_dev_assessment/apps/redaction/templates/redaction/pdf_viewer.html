@@ -1,82 +1,108 @@
-<!-- PDF Viewer (Left Panel) -->
+<!-- PDF Viewer with Fixed Toolbar -->
 <div id="pdf-signals" 
-     class="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
-     data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1, selections: []}, notification: {show: false, message: '', type: 'success'}}">
+     class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+     data-signals="{type: 'text', coordinates: {x: 0, y: 0, width: 0, height: 0, page: 1, selections: []}, _hoveredRedaction: null}">
     
-    <div class="h-full flex flex-col">
-        <!-- PDF Container -->
-        <div class="flex-1 bg-gray-100 overflow-auto">
-            <div class="max-w-4xl mx-auto p-8">
-                <!-- Loading Indicator -->
-                {% include "redaction/pdf_loader.html" %}
+    <!-- Fixed Toolbar (Sticky within this container) -->
+    <div class="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+        <div class="px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+            <!-- Left: Mode Selector -->
+            <div class="flex-shrink-0">
+                {% include "redaction/mode_selector.html" %}
+            </div>
+            
+            <!-- Center: Pagination -->
+            <div class="flex-1 flex justify-center min-w-[200px]">
+                {% include "redaction/pagination.html" %}
+            </div>
+            
+            <!-- Right: Download Button -->
+            <div class="flex-shrink-0">
+                <a href="{% url 'redaction:document_download' document.pk %}"
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-sm">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    <span class="hidden sm:inline">Download PDF</span>
+                    <span class="sm:hidden">PDF</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- PDF Container with Scroll -->
+    <div class="bg-gray-100 overflow-auto" style="max-height: calc(100vh - 12rem);"
+        data-on-signal-patch="renderPage(patch.coordinates.page)"
+        data-on-signal-patch-filter="{include: /^coordinates\.page$/, exclude: /^(_fetching|type|_hoveredRedaction)$/}">
+        <div class="p-2 sm:p-4">
+            <!-- Loading Indicator -->
+            {% include "redaction/pdf_loader.html" %}
+            
+            <!-- PDF Canvas Container -->
+            <div id="pdf-container" class="pdfViewer relative bg-white shadow-2xl rounded-lg overflow-hidden mx-auto" style="max-width: fit-content;">
+                <!-- Base PDF Canvas -->
+                <canvas id="pdf"></canvas>
                 
-                <!-- PDF Canvas Container -->
-                <div id="pdf-container" class="pdfViewer relative bg-white shadow-2xl rounded-lg overflow-hidden">
-                    <!-- Base PDF Canvas -->
-                    <canvas id="pdf" class="mx-auto"></canvas>
-                    
-                    <!-- Redaction Overlays Layer - Shows all existing redactions as black boxes -->
-                    <div id="annotation-layer" class="select-none">
-                        {% for redaction in redactions %}
-                            {% if redaction.coordinates.boxes %}
-                                <!-- Multi-box redaction (multiple lines selected) -->
-                                {% for box in redaction.coordinates.boxes %}
-                                    <div id="redaction-{{ redaction.id }}-box-{{ forloop.counter0 }}"
-                                         data-redaction-id="{{ redaction.id }}"
-                                         data-show="$coordinates.page === {{ redaction.coordinates.page }}"
-                                         class="select-none absolute bg-black z-20 
-                                                left-[calc({{ box.x }}px*var(--scale-factor))]
-                                                top-[calc({{ box.y }}px*var(--scale-factor))]
-                                                w-[calc({{ box.width }}px*var(--scale-factor))]
-                                                h-[calc({{ box.height }}px*var(--scale-factor))]">
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <!-- Single-box redaction -->
-                                {% include "redaction/redaction_block.html" %}
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                    
-                    <!-- Text Layer: Enables text selection in 'text' mode, hidden when in 'area' mode -->
-                    <div id="text-layer"
-                         class="textLayer"
-                         data-show="$type === 'text'"
-                         data-on:mouseup="
-                            if (evt.target.matches('span')) {
-                                const selections = handleTextSelection();
-                                if (selections?.length) {
-                                    $coordinates.selections = selections;
-                                    @post('/document/{{ document.pk }}/redactions/create/');
-                                }
-                            }
-                         ">
-                    </div>
-                    
-                    <!-- Drawing Canvas: Enables rectangle drawing in 'area' mode, hidden when in 'text' mode -->
-                    <canvas id="drawing-canvas"
-                            class="absolute top-0 left-0 z-5 cursor-crosshair"
-                            data-show="$type === 'area'"
-                            data-indicator:_creating
-                            data-on:mousedown="startDrawing(evt)"
-                            data-on:mousemove="drawRectanglePreview(evt)"
-                            data-on:mouseup="
-                                const sel = stopDrawing(evt);
-                                if (sel) {
-                                    $coordinates.x = sel.x;
-                                    $coordinates.y = sel.y;
-                                    $coordinates.width = sel.width;
-                                    $coordinates.height = sel.height;
-                                    @post('/document/{{ document.pk }}/redactions/create/');
-                                }
-                            "
-                            data-on-signal-patch="!patch._creating ? clearDrawingCanvas() : ''"
-                            data-on-signal-patch-filter="{include: /^_creating/}">
-                    </canvas>
+                <!-- Redaction Overlays Layer with Hover Effects -->
+                <div id="annotation-layer" class="select-none">
+                    {% for redaction in redactions %}
+                        {% if redaction.coordinates.boxes %}
+                            <!-- Multi-box redaction (multiple lines selected) -->
+                            {% for box in redaction.coordinates.boxes %}
+                            <div id="redaction-{{ redaction.id }}-box-{{ forloop.counter0 }}"
+                                    data-show="$coordinates.page === {{ redaction.coordinates.page }}"
+                                    data-on:mouseenter="$_hoveredRedaction = {{ redaction.id }}"
+                                    data-on:mouseleave="$_hoveredRedaction = ''"
+                                    data-class="{'ring-4 ring-blue-500 ring-opacity-70 z-30': $_hoveredRedaction === {{ redaction.id }}, 'z-20': $_hoveredRedaction !== {{ redaction.id }}}"
+                                    class="select-none absolute bg-black transition-all duration-200
+                                            left-[calc({{ box.x }}px*var(--scale-factor))]
+                                            top-[calc({{ box.y }}px*var(--scale-factor))]
+                                            w-[calc({{ box.width }}px*var(--scale-factor))]
+                                            h-[calc({{ box.height }}px*var(--scale-factor))]">
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <!-- Single-box redaction -->
+                            {% include "redaction/redaction_block.html" %}
+                        {% endif %}
+                    {% endfor %}
                 </div>
                 
-                <!-- Page Navigation Controls -->
-                {% include "redaction/pagination.html" %}
+                <!-- Text Layer: Enables text selection in 'text' mode -->
+                <div id="text-layer"
+                     class="textLayer"
+                     data-show="$type === 'text'"
+                     data-on:mouseup="
+                        if (evt.target.matches('span')) {
+                            const selections = handleTextSelection();
+                            if (selections?.length) {
+                                $coordinates.selections = selections;
+                                @post('/document/{{ document.pk }}/redactions/create/');
+                            }
+                        }
+                     ">
+                </div>
+                
+                <!-- Drawing Canvas: Enables rectangle drawing in 'area' mode -->
+                <canvas id="drawing-canvas"
+                        class="absolute top-0 left-0 z-5 cursor-crosshair"
+                        data-show="$type === 'area'"
+                        data-indicator:_creating
+                        data-on:mousedown="startDrawing(evt)"
+                        data-on:mousemove="drawRectanglePreview(evt)"
+                        data-on:mouseup="
+                            const sel = stopDrawing(evt);
+                            if (sel) {
+                                $coordinates.x = sel.x;
+                                $coordinates.y = sel.y;
+                                $coordinates.width = sel.width;
+                                $coordinates.height = sel.height;
+                                @post('/document/{{ document.pk }}/redactions/create/');
+                            }
+                        "
+                        data-on-signal-patch="!patch._creating ? clearDrawingCanvas() : ''"
+                        data-on-signal-patch-filter="{include: /^_creating/}">
+                </canvas>
             </div>
         </div>
     </div>

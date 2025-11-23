@@ -26,6 +26,7 @@ REDACTIONS_LIST_SELECTOR = "#redactions-list"
 ANNOTATION_LAYER_SELECTOR = "#annotation-layer"
 EMPTY_REDACTIONS_SELECTOR = "#empty-redactions"
 REDACTION_COUNT_SELECTOR = "#redaction-count"
+NOTIFICATION_SELECTOR = "#notification-container"
 
 
 # ============================================================================
@@ -103,7 +104,7 @@ def extract_pdf_coords(coords, page_height):
     return x, y, width, height
 
 
-def create_redaction_overlay_html(redaction_id, coordinates, page, is_multi_box=False, box_index=0):
+def create_redaction_box_html(redaction_id, coordinates, page, redaction_type, is_multi_box=False, box_index=0):
     """
     Generate HTML for a redaction overlay element.
     
@@ -121,11 +122,15 @@ def create_redaction_overlay_html(redaction_id, coordinates, page, is_multi_box=
     if is_multi_box:
         element_id += f"-box-{box_index}"
     
+    color_class = "ring-blue-500" if redaction_type == "text" else "ring-purple-500"
     return (
         f'<div id="{element_id}" '
         f'data-redaction-id="{redaction_id}" '
         f'data-show="$coordinates.page === {page}" '
-        f'class="select-none absolute '
+        f'data-on:mouseenter="$_hoveredRedaction = {redaction_id}" '
+        f'data-on:mouseleave="$_hoveredRedaction = \'\'" '
+        f'data-class="{{\'ring-4 {color_class} ring-opacity-70 z-30\': $_hoveredRedaction === {redaction_id}, \'z-20\': $_hoveredRedaction !== {redaction_id}}}" '
+        f'class="pointer-events-auto select-none absolute '
         f'left-[calc({coordinates["x"]}px*var(--scale-factor))] '
         f'top-[calc({coordinates["y"]}px*var(--scale-factor))] '
         f'w-[calc({coordinates["width"]}px*var(--scale-factor))] '
@@ -158,18 +163,20 @@ def build_redaction_response(document, redaction, is_multi_box=False):
     if is_multi_box and "boxes" in redaction.coordinates:
         overlay_html = ""
         for i, box in enumerate(redaction.coordinates["boxes"]):
-            overlay_html += create_redaction_overlay_html(
+            overlay_html += create_redaction_box_html(
                 redaction_id=redaction.id,
                 coordinates=box,
                 page=redaction.coordinates["page"],
+                redaction_type=redaction.redaction_type,
                 is_multi_box=True,
-                box_index=i
+                box_index=i,
             )
     else:
-        overlay_html = create_redaction_overlay_html(
+        overlay_html = create_redaction_box_html(
             redaction_id=redaction.id,
             coordinates=redaction.coordinates,
-            page=redaction.coordinates["page"]
+            page=redaction.coordinates["page"],
+            redaction_type=redaction.redaction_type
         )
     
     # Build patch elements
@@ -295,6 +302,32 @@ def add_pdf_redaction_annotation(page, x, y, width, height):
     page["/Annots"].append(redaction_annotation)
 
 
+def create_notification_html(context, message):
+    """
+    Create a notification.
+    
+    Args:
+        context (dict): Context dictionary for rendering the notification template
+            notification_type (str): Type of notification ('success', 'error', etc.)
+            notification_title (str): Notification title
+        message (str): Notification message content
+    """
+
+    context = {
+        "notification_type": context.get("notification_type"),
+        "notification_title": context.get("notification_title"),
+        "notification_message": message,
+        # ...other context...
+    }
+    notification_html = render_to_string("redaction/notification.html", context)
+
+    return SSE.patch_elements(
+                notification_html,
+                selector=NOTIFICATION_SELECTOR,
+                mode=ElementPatchMode.APPEND,
+            )
+
+
 # ============================================================================
 # VIEWS
 # ============================================================================
@@ -362,25 +395,21 @@ def redaction_create(request, document_id):
         
         # Validate redaction type
         if redaction_type not in ("text", "area"):
-            return JsonResponse({"error": "Invalid redaction type"}, status=400)
+            return DatastarResponse(create_notification_html(context={"notification_type": "error","notification_title": "Invalid"}, message="Invalid redaction type"))
         
         # Check for multi-line text selection
         selections = None
         if isinstance(coordinates, dict) and redaction_type == "text":
             selections = coordinates.get("selections")
         
-        # Handle multi-box redaction (multiple lines selected)
-        if selections and len(selections) > 1:
+        is_multi_box = selections and len(selections) > 1
+        if is_multi_box:
             redaction = create_multi_box_redaction(
                 document=document,
                 redaction_type=redaction_type,
                 page=coordinates.get("page"),
                 selections=selections
             )
-            response = build_redaction_response(document, redaction, is_multi_box=True)
-            return DatastarResponse(response)
-        
-        # Handle single-box redaction
         else:
             # Extract single selection from array if present
             if selections and len(selections) == 1:
@@ -388,17 +417,13 @@ def redaction_create(request, document_id):
                 single_coords["page"] = coordinates.get("page")
             else:
                 single_coords = coordinates
-            
             # Validate coordinates
-            is_valid, error_msg = validate_coordinates(single_coords)
+            is_valid = validate_coordinates(single_coords)
             if not is_valid:
-                return JsonResponse({"error": error_msg}, status=400)
-            
+                return DatastarResponse(create_notification_html(context={"notification_type": "error","notification_title": "Invalid"}, message="Invalid coordinates"))
             # Validate page field
             if "page" not in single_coords:
-                return JsonResponse({"error": "Missing page field"}, status=400)
-            
-            # Create redaction
+                return DatastarResponse(create_notification_html(context={"notification_type": "error","notification_title": "No page field"}, message="Missing page field in coordinates."))
             try:
                 redaction = create_single_box_redaction(
                     document=document,
@@ -407,17 +432,18 @@ def redaction_create(request, document_id):
                 )
             except ValueError as e:
                 return JsonResponse({"error": str(e)}, status=400)
-            
-            response = build_redaction_response(document, redaction, is_multi_box=False)
-            return DatastarResponse(response)
 
+        response = build_redaction_response(document, redaction, is_multi_box=is_multi_box)
+        response.append(create_notification_html(context={"notification_type": "success","notification_title": "Redaction created!"}, message="Redaction created successfully."))
+        return DatastarResponse(response)
+        
     except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
+        return DatastarResponse(create_notification_html(context={"notification_type": "error","notification_title": "JSON Decoder Error"}, message="Invalid JSON."))
     except Exception as e:
         import traceback
         print("[redaction_create] Exception:", e)
         traceback.print_exc()
-        return JsonResponse({"error": str(e)}, status=400)
+        return DatastarResponse(create_notification_html(context={"notification_type": "error","notification_title": "Something went wrong!"}, message="Redaction was not created."))
 
 
 @csrf_exempt
@@ -474,6 +500,7 @@ def redaction_delete(request, document_id, redaction_id):
                 )
             )
 
+        elements_to_patch.append(create_notification_html(context={"notification_type": "success","notification_title": "Redaction deleted!"}, message="Redaction was deleted successfully."))
         return DatastarResponse(elements_to_patch)
 
     except Redaction.DoesNotExist:

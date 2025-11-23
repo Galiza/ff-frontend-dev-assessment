@@ -27,16 +27,16 @@
 		<link rel="stylesheet" type="text/css" href="{% static 'pdf/fonts/style.css' %}">
 
 		<style>
-			@keyframes slideInRight {
-				from { transform: translateX(100%); opacity: 0; }
-				to { transform: translateX(0); opacity: 1; }
+			@keyframes slideInCenter {
+				from { transform: translateY(-100%) scale(0.95); opacity: 0; }
+				to { transform: translateY(0) scale(1); opacity: 1; }
 			}
-			@keyframes slideOutRight {
-				from { transform: translateX(0); opacity: 1; }
-				to { transform: translateX(100%); opacity: 0; }
+			@keyframes slideOutCenter {
+				from { transform: translateY(0) scale(1); opacity: 1; }
+				to { transform: translateY(-100%) scale(0.95); opacity: 0; }
 			}
-			.notification-enter { animation: slideInRight 0.3s ease-out; }
-			.notification-exit { animation: slideOutRight 0.3s ease-in; }
+			.notification-enter { animation: slideInCenter 0.3s cubic-bezier(0.4,0,0.2,1); }
+			.notification-exit { animation: slideOutCenter 0.3s cubic-bezier(0.4,0,0.2,1); }
 		</style>
 
 		{% block extra_head %}{% endblock %}
@@ -64,12 +64,12 @@
 		</header>
 
 		<!-- Main Content -->
-		<main class="max-w-full mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+		<main class="max-w-full mx-auto px-4 pb-4">
 			{% block content %}{% endblock %}
 		</main>
 
 		<!-- Notification Container -->
-		<div id="notification-container" class="fixed top-20 right-4 z-50 space-y-3 max-w-sm">
+		<div id="notification-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-50 space-y-3 max-w-sm shadow-2x1">
 		</div>
 
 		{% block extra_scripts %}{% endblock %}

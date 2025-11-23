@@ -1,19 +1,28 @@
-<!-- Redaction List Item -->
+<!-- Redaction List -->
 <li id="redaction-item-{{ redaction.id }}"
-	class="bg-gray-50 rounded-lg p-4 border border-gray-200 {% if redaction.redaction_type == 'text' %}hover:border-blue-300 hover:bg-blue-50{% else %}hover:border-purple-300 hover:bg-purple-50{% endif %} transition-all group">
-    <div class="flex items-start justify-between mb-2">
+    data-on:mouseenter="$_hoveredRedaction = {{ redaction.id }}"
+    data-on:mouseleave="$_hoveredRedaction = ''"
+    data-class="{'{% if redaction.redaction_type == 'text' %}border-blue-500 bg-blue-50{% else %}border-purple-500 bg-purple-50{% endif %}': $_hoveredRedaction === {{ redaction.id }}, 
+				'border-gray-200': $_hoveredRedaction !== {{ redaction.id }}}"
+    class="bg-white rounded-lg p-3 border transition-all duration-200 group cursor-pointer hover:shadow-md scale-[1.02]">
+    <div class="flex items-center justify-between gap-2 mb-2">
         <!-- Redaction Type Badge -->
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium flex-shrink-0
                      {% if redaction.redaction_type == 'text' %}bg-blue-100 text-blue-800{% else %}bg-purple-100 text-purple-800{% endif %}">
             {{ redaction.get_redaction_type_display }}
         </span>
         
-        <!-- Delete Button (shows on hover) -->
+        <!-- Page Number Badge -->
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 flex-shrink-0">
+            Page {{ redaction.coordinates.page|default:"?" }}
+        </span>
+        
+        <!-- Delete Button -->
         <button data-indicator:_fetching
                 data-attr:disabled="$_fetching"
                 data-on:click="@delete('/document/{{document.id}}/redaction/{{redaction.id}}/delete/')"
                 data-class="{'opacity-50 cursor-not-allowed': $_fetching}"
-                class="text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+                class="text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex-shrink-0"
                 title="Delete redaction">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -22,17 +31,32 @@
     </div>
     
     <!-- Redaction Details -->
-    <div class="text-xs text-gray-600 space-y-1">
-        <p>Page {{ redaction.coordinates.page|default:"?" }}</p>
-        
+    <div class="text-xs text-gray-600">
         {% if redaction.coordinates.boxes %}
-            <!-- Multi-line redaction details -->
-            <p class="text-gray-500">({{ redaction.coordinates.boxes|length }} boxes)</p>
-            <p class="text-gray-500">Multi-line selection</p>
+            <!-- Multi-line redaction -->
+            <p class="flex items-center gap-1">
+                <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+                </svg>
+                <span class="truncate">Multi-line ({{ redaction.coordinates.boxes|length }} boxes)</span>
+            </p>
         {% else %}
-            <!-- Single redaction details -->
-            <p>Position: ({{ redaction.coordinates.x|floatformat:0 }}, {{ redaction.coordinates.y|floatformat:0 }})</p>
-            <p>Size: {{ redaction.coordinates.width|floatformat:0 }} × {{ redaction.coordinates.height|floatformat:0 }}</p>
+            <!-- Single redaction -->
+            <div class="flex items-center gap-3 text-[11px]">
+                <span class="flex items-center gap-1 flex-shrink-0">
+                    <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    {{ redaction.coordinates.x|floatformat:0 }},{{ redaction.coordinates.y|floatformat:0 }}
+                </span>
+                <span class="flex items-center gap-1 flex-shrink-0">
+                    <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                    </svg>
+                    {{ redaction.coordinates.width|floatformat:0 }}×{{ redaction.coordinates.height|floatformat:0 }}
+                </span>
+            </div>
         {% endif %}
     </div>
 </li>
